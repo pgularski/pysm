@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict
+import collections
 from Queue import deque
+
+
+class StateMachineException(Exception):
+    pass
 
 
 class Event(object):
@@ -56,7 +60,7 @@ class State(object):
 class TransitionsContainer(object):
     def __init__(self, machine):
         self._machine = machine
-        self._transitions = defaultdict(list)
+        self._transitions = collections.defaultdict(list)
 
     def add(self, key, transition):
         self._transitions[key].append(transition)
@@ -99,8 +103,10 @@ class StateMachine(State):
         self._transitions = TransitionsContainer(self)
         self.state_stack = Stack(maxlen=32)
         self.stack = Stack()
+        self.validator = Validator(self)
 
     def add_state(self, state, initial=False):
+        self.validator.validate_add_state(state)
         state.initial = initial
         state.parent = self
         self.states.add(state)
@@ -119,6 +125,13 @@ class StateMachine(State):
                 return state
         return None
 
+    @property
+    def root_machine(self):
+        machine = self
+        while machine.parent:
+            machine = machine.parent
+        return machine
+
     def add_transition(
             self, from_state, to_state, events, input=None, action=None,
             condition=None, before=None, after=None):
@@ -132,6 +145,8 @@ class StateMachine(State):
             after = self._nop
         if condition is None:
             condition = self._nop
+
+        self.validator.validate_add_transition(from_state, to_state, events)
 
         for input_value in input:
             for event in events:
@@ -218,3 +233,50 @@ class StateMachine(State):
             state.on(Event('enter', propagate=False))
             state.parent.state = state
             state.parent.state_stack.push(state)
+
+
+class Validator(object):
+    def __init__(self, state_machine):
+        self.state_machine = state_machine
+        self.template = 'Machine "{0}" error: {1}'.format(
+            self.state_machine.name, '{0}')
+
+    def _raise(self, msg):
+        raise StateMachineException(self.template.format(msg))
+
+    def validate_add_state(self, state):
+        if not isinstance(state, State):
+            msg = 'Unable to add state of type {0}'.format(type(state))
+            self._raise(msg)
+
+    def validate_add_transition(self, from_state, to_state, events):
+        root_machine = self.state_machine.root_machine
+        self._validate_from_state(from_state)
+        self._validate_to_state(to_state)
+        self._validate_events(events)
+
+    def _validate_from_state(self, from_state):
+        root_machine = self.state_machine.root_machine
+        if from_state is root_machine:
+            return
+        elif not from_state.is_substate(root_machine):
+            msg = 'Unable to add transition from unknown state "{0}"'.format(
+                from_state.name)
+            self._raise(msg)
+
+    def _validate_to_state(self, to_state):
+        root_machine = self.state_machine.root_machine
+        if to_state is None:
+            return
+        elif to_state is root_machine:
+            return
+        elif not to_state.is_substate(root_machine):
+            msg = 'Unable to add transition to unknown state "{0}"'.format(
+                to_state.name)
+            self._raise(msg)
+
+    def _validate_events(self, events):
+        if not isinstance(events, collections.Iterable):
+            msg = 'Unable to add transition, {0} is not iterable'.format(
+                events)
+            self._raise(msg)

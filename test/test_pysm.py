@@ -1,6 +1,7 @@
 import inspect
 import mock
-from pysm import Event, State, StateMachine
+import pytest
+from pysm import Event, State, StateMachine, StateMachineException
 _e = Event
 
 
@@ -237,6 +238,8 @@ def test_hsm_get_transition():
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
     s2 = StateMachine('s2')
+    s0.add_state(s1)
+    s0.add_state(s2)
     s0.add_transition(s1, s2, events='a')
     s11 = State('s11')
     s12 = State('s12')
@@ -254,6 +257,8 @@ def test_hsm_simple_hsm_transition():
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
     s2 = StateMachine('s2')
+    s0.add_state(s1)
+    s0.add_state(s2)
     s0.add_transition(s1, s2, events='a')
     s0.add_transition(s2, s1, events='a')
     s11 = State('s11')
@@ -568,3 +573,79 @@ def test_internal_vs_external_transitions():
     m.dispatch(_e('h'))
     assert test_list == []
     assert m.leaf_state == s211
+
+
+def test_add_transition_unknown_state():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    s2 = State('s2')  # This state isn't added to sm
+    s3 = StateMachine('s3')
+    s31 = State('s31')
+    s32 = State('s32')  # This state isn't added to s3
+
+    sm.add_state(s1)
+    sm.add_state(s3)
+    s3.add_state(s31)
+
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_transition(s1, s2, events='a')
+    expected = (
+        'Machine "sm" error: Unable to add transition to unknown state "s2"')
+    assert expected in str(exc.value)
+
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_transition(s2, s1, events='a')
+    expected = (
+        'Machine "sm" error: Unable to add transition from unknown state "s2"')
+    assert expected in str(exc.value)
+
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_transition(s1, s32, events='a')
+    expected = (
+        'Machine "sm" error: Unable to add transition to unknown state "s32"')
+    assert expected in str(exc.value)
+
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_transition(s32, s1, events='a')
+    expected = (
+        'Machine "sm" error: Unable to add transition from unknown state "s32"')
+    assert expected in str(exc.value)
+
+
+def test_events_not_iterable():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    sm.add_state(s1)
+
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_transition(s1, None, events=1)
+    expected = (
+        'Machine "sm" error: Unable to add transition, 1 is not iterable')
+    assert expected in str(exc.value)
+
+
+def test_add_not_a_state_instance():
+    class NotState(object):
+        pass
+
+    sm = StateMachine('sm')
+    s1 = NotState()
+
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_state(s1)
+    expected = (
+        'Machine "sm" error: Unable to add state of '
+        'type <class \'test_pysm.NotState\'>')
+    assert expected in str(exc.value)
+
+
+def test_add_transition_to_state_above():
+    pass
+
+
+def test_no_initial_state():
+    pass
+
+
+def test_add_state_that_is_already_added_anywhere_in_the_hsm():
+    pass

@@ -1,1 +1,1 @@
-from pysm import State, StateMachine, Event
+from pysm import State, StateMachine, Event, StateMachineException
