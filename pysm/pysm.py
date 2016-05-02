@@ -247,8 +247,24 @@ class Validator(object):
         if not isinstance(state, State):
             msg = 'Unable to add state of type {0}'.format(type(state))
             self._raise(msg)
+        self._validate_state_already_added(state)
         if initial is True:
             self.validate_set_initial(state)
+
+    def _validate_state_already_added(self, state):
+        root_machine = self.state_machine.root_machine
+        machines = deque()
+        machines.append(root_machine)
+        while machines:
+            machine = machines.popleft()
+            if state in machine.states and machine is not self.state_machine:
+                msg = ('Machine "{0}" error: State "{1}" is already added '
+                       'to machine "{2}"'.format(
+                            self.state_machine.name, state.name, machine.name))
+                self._raise(msg)
+            for child_state in machine.states:
+                if isinstance(child_state, StateMachine):
+                    machines.append(child_state)
 
     def validate_set_initial(self, state):
         for added_state in self.state_machine.states:

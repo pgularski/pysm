@@ -671,7 +671,24 @@ def test_many_initial_states():
 
 
 def test_add_state_that_is_already_added_anywhere_in_the_hsm():
-    pass
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    s2 = State('s2')
+    s3 = StateMachine('s3')
+    s31 = State('s31')
+    s32 = State('s32')
+
+    sm.add_state(s1)
+    sm.add_state(s2)
+    sm.add_state(s3)
+    s3.add_state(s31)
+    s3.add_state(s32)
+
+    with pytest.raises(StateMachineException) as exc:
+        s3.add_state(s2)
+    expected = ('Machine "s3" error: State "s2" is already added '
+                'to machine "sm"')
+    assert expected in str(exc.value)
 
 
 def test_state_stack():
