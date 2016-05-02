@@ -277,6 +277,6 @@ class Validator(object):
 
     def _validate_events(self, events):
         if not isinstance(events, collections.Iterable):
-            msg = 'Unable to add transition, {0} is not iterable'.format(
-                events)
+            msg = ('Unable to add transition, events is not iterable: {0}'
+                .format(events))
             self._raise(msg)

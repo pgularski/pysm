@@ -620,7 +620,8 @@ def test_events_not_iterable():
     with pytest.raises(StateMachineException) as exc:
         sm.add_transition(s1, None, events=1)
     expected = (
-        'Machine "sm" error: Unable to add transition, 1 is not iterable')
+        'Machine "sm" error: Unable to add transition, '
+        'events is not iterable: 1')
     assert expected in str(exc.value)
 
 
@@ -637,10 +638,6 @@ def test_add_not_a_state_instance():
         'Machine "sm" error: Unable to add state of '
         'type <class \'test_pysm.NotState\'>')
     assert expected in str(exc.value)
-
-
-def test_add_transition_to_state_above():
-    pass
 
 
 def test_no_initial_state():
