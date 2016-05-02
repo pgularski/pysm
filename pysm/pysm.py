@@ -106,7 +106,7 @@ class StateMachine(State):
         self.validator = Validator(self)
 
     def add_state(self, state, initial=False):
-        self.validator.validate_add_state(state)
+        self.validator.validate_add_state(state, initial)
         state.initial = initial
         state.parent = self
         self.states.add(state)
@@ -116,6 +116,7 @@ class StateMachine(State):
             self.add_state(state)
 
     def set_initial_state(self, state):
+        self.validator.validate_set_initial(state)
         state.initial = True
 
     @property
@@ -161,9 +162,6 @@ class StateMachine(State):
                 }
                 self._transitions.add(key, transition)
 
-    def initialize(self):
-        self.state = self.initial_state
-
     def get_transition(self, event):
         machine = self.leaf_state.parent
         while machine:
@@ -183,14 +181,15 @@ class StateMachine(State):
         return state
 
     def initialize(self):
-        states = deque()
-        states.append(self)
-        while states:
-            state = states.popleft()
-            state.state = state.initial_state
-            for child_state in state.states:
+        machines = deque()
+        machines.append(self)
+        while machines:
+            machine = machines.popleft()
+            self.validator.validate_initial_state(machine)
+            machine.state = machine.initial_state
+            for child_state in machine.states:
                 if isinstance(child_state, StateMachine):
-                    states.append(child_state)
+                    machines.append(child_state)
 
     def dispatch(self, event):
         self.leaf_state.on(event)
@@ -244,10 +243,20 @@ class Validator(object):
     def _raise(self, msg):
         raise StateMachineException(self.template.format(msg))
 
-    def validate_add_state(self, state):
+    def validate_add_state(self, state, initial):
         if not isinstance(state, State):
             msg = 'Unable to add state of type {0}'.format(type(state))
             self._raise(msg)
+        if initial is True:
+            self.validate_set_initial(state)
+
+    def validate_set_initial(self, state):
+        for added_state in self.state_machine.states:
+            if added_state.initial is True and added_state is not state:
+                msg = ('Unable to set initial state to "{0}". '
+                        'Initial state is already set to "{1}"'
+                    .format(state.name, added_state.name))
+                self._raise(msg)
 
     def validate_add_transition(self, from_state, to_state, events):
         root_machine = self.state_machine.root_machine
@@ -279,4 +288,9 @@ class Validator(object):
         if not isinstance(events, collections.Iterable):
             msg = ('Unable to add transition, events is not iterable: {0}'
                 .format(events))
+            self._raise(msg)
+
+    def validate_initial_state(self, machine):
+        if machine.states and not machine.initial_state:
+            msg = 'Machine "{0}" has no initial state'.format(machine.name)
             self._raise(msg)

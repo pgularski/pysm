@@ -641,8 +641,42 @@ def test_add_not_a_state_instance():
 
 
 def test_no_initial_state():
-    pass
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    s2 = State('s2')
+    try:
+        sm.initialize()
+    except StateMachineException as exc:
+        assert not exc
+
+    sm.add_state(s1)
+    sm.add_state(s2)
+    with pytest.raises(StateMachineException) as exc:
+        sm.initialize()
+    expected = ('Machine "sm" error: Machine "sm" has no initial state')
+    assert expected in str(exc.value)
+
+
+def test_many_initial_states():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    s2 = State('s2')
+
+    sm.add_state(s1, initial=True)
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_state(s2, initial=True)
+    expected = ('Machine "sm" error: Unable to set initial state to "s2". '
+                'Initial state is already set to "s1"')
+    assert expected in str(exc.value)
 
 
 def test_add_state_that_is_already_added_anywhere_in_the_hsm():
+    pass
+
+
+def test_state_stack():
+    pass
+
+
+def test_stack():
     pass
