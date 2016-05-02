@@ -121,11 +121,15 @@ class StateMachine(State):
 
     def add_transition(
             self, from_state, to_state, events, input=None, action=None,
-            condition=None):
+            condition=None, before=None, after=None):
         if input is None:
             input = [None]
         if action is None:
             action = self._nop
+        if before is None:
+            before = self._nop
+        if after is None:
+            after = self._nop
         if condition is None:
             condition = self._nop
 
@@ -136,31 +140,14 @@ class StateMachine(State):
                     'from_state': from_state,
                     'to_state': to_state,
                     'action': action,
-                    'condition': condition
+                    'condition': condition,
+                    'before': before,
+                    'after': after,
                 }
                 self._transitions.add(key, transition)
 
     def initialize(self):
         self.state = self.initial_state
-
-    def dispatch(self, event):
-        self.state.on(event)
-        transition = self._transitions.get(event)
-        if transition is None:
-            return
-        if transition['to_state'] is None:
-            transition['action'](event)
-            return
-        self.state.on(Event('exit'))
-        self.state_stack.push(self.state)
-        self.state = transition['to_state']
-        transition['action'](event)
-        self.state.on(Event('enter'))
-
-
-class HierarchicalStateMachine(StateMachine):
-    def __init__(self, name):
-        super(HierarchicalStateMachine, self).__init__(name)
 
     def get_transition(self, event):
         machine = self.leaf_state.parent
@@ -201,13 +188,15 @@ class HierarchicalStateMachine(StateMachine):
             transition['action'](event)
             return
 
+        transition['before'](event)
         top_state = self._exit_states(event, from_state, to_state)
         transition['action'](event)
         self._enter_states(event, top_state, to_state)
+        transition['after'](event)
 
     def _exit_states(self, event, from_state, to_state):
         state = self.leaf_state
-        while (
+        while (state.parent and
                 not (from_state.is_substate(state) and
                      to_state.is_substate(state))
                 or (state == from_state == to_state)
@@ -222,7 +211,7 @@ class HierarchicalStateMachine(StateMachine):
         path = []
         state = self._get_leaf_state(to_state)
 
-        while state != top_state:
+        while state.parent and state != top_state:
             path.append(state)
             state = state.parent
         for state in reversed(path):

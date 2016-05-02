@@ -65,7 +65,7 @@ class Parser(object):
 
         sm = StateMachine(self)
         sm.add_states(
-            start, identifier, operator, number, start_quote, string,
+            start, identifier, operator, number, start_quote, string_st,
             end_quote)
         sm.set_initial_state(start)
 
@@ -116,13 +116,13 @@ class Parser(object):
 
         at = sm.add_transition
         at(start, start, events=string.whitespace)
-        at(start, identifier, events=string.letters, action=self.t.StartToken)
-        at(start, operator, events='=+*/-()', action=self.t.StartToken)
-        at(start, number, events=string.digits, action=self.t.StartToken)
-        at(start, start_quote, events="'", action=self.t.StartToken)
+        at(start, identifier, events=string.letters, after=self.t.StartToken)
+        at(start, operator, events='=+*/-()', after=self.t.StartToken)
+        at(start, number, events=string.digits, after=self.t.StartToken)
+        at(start, start_quote, events="'", after=self.t.StartToken)
         at(identifier, identifier, events=alnum, action=self.t.addCharacter)
         at(identifier, start, events=not_alnum, action=self.t.EndToken)
-        at(start_quote, string_st, events=not_quote, action=self.t.StartToken)
+        at(start_quote, string_st, events=not_quote, after=self.t.StartToken)
         at(operator, start, events=string.printable, action=self.t.EndToken)
         at(number, number, events=digits_and_dot, action=self.t.addCharacter)
         at(number, start, events=not_digit_or_dot, action=self.t.EndToken)

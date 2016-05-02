@@ -1,1 +1,1 @@
-from pysm import State, StateMachine, HierarchicalStateMachine, Event
+from pysm import State, StateMachine, Event

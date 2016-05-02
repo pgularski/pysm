@@ -1,6 +1,6 @@
 import inspect
 import mock
-from pysm import Event, State, StateMachine, HierarchicalStateMachine
+from pysm import Event, State, StateMachine
 _e = Event
 
 
@@ -130,6 +130,8 @@ def test_conditions():
     sm = StateMachine('sm')
     sm.add_state(idling, initial=True)
     sm.add_state(running)
+    sm.add_state(stopped)
+    sm.add_state(broken)
     sm.add_transition(idling, running, events=['run'], condition=bool_a.get)
     sm.add_transition(idling, stopped, events=['run'], condition=bool_b.get)
     sm.add_transition(running, idling, events=['idle'])
@@ -214,7 +216,7 @@ def test_internal_transition():
 
 
 def test_hsm_init():
-    sm = HierarchicalStateMachine('sm')
+    sm = StateMachine('sm')
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
     s2 = StateMachine('s2')
@@ -231,7 +233,7 @@ def test_hsm_init():
 
 
 def test_hsm_get_transition():
-    sm = HierarchicalStateMachine('sm')
+    sm = StateMachine('sm')
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
     s2 = StateMachine('s2')
@@ -248,7 +250,7 @@ def test_hsm_get_transition():
 
 
 def test_hsm_simple_hsm_transition():
-    sm = HierarchicalStateMachine('sm')
+    sm = StateMachine('sm')
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
     s2 = StateMachine('s2')
@@ -291,7 +293,7 @@ def test_enter_exit_on_transitions():
         # print 'exiting', state
         test_list.append(('exit', state))
 
-    m = HierarchicalStateMachine('m')
+    m = StateMachine('m')
     # exit = m.add_state('exit', terminal=True)
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
@@ -441,7 +443,7 @@ def test_internal_vs_external_transitions():
         test_list.append('action_n')
         return True
 
-    m = HierarchicalStateMachine('m')
+    m = StateMachine('m')
     # exit = m.add_state('exit', terminal=True)
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
