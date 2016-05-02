@@ -1,3 +1,6 @@
 *.pyc
 *.pyo
 .cache
+/dist/
+/*.egg-info
+.eggs
