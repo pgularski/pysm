@@ -3,6 +3,13 @@
 
 import collections
 from Queue import deque
+import logging
+import sys
+
+log = logging.getLogger(__name__)
+handler = logging.StreamHandler(sys.stdout)
+log.addHandler(handler)
+log.setLevel(logging.INFO)
 
 
 class StateMachineException(Exception):
@@ -68,9 +75,6 @@ class TransitionsContainer(object):
     def get(self, event):
         key = (self._machine.state, event.name, event.input)
         return self._get_transition_matching_condition(key, event)
-
-    def has(self, key):
-        return key in self._transitions
 
     def _get_transition_matching_condition(self, key, event):
         for transition in self._transitions[key]:
@@ -147,7 +151,8 @@ class StateMachine(State):
         if condition is None:
             condition = self._nop
 
-        self.validator.validate_add_transition(from_state, to_state, events)
+        self.validator.validate_add_transition(
+            from_state, to_state, events, input)
 
         for input_value in input:
             for event in events:
@@ -215,6 +220,7 @@ class StateMachine(State):
                      to_state.is_substate(state))
                 or (state == from_state == to_state)
         ):
+            log.debug('exiting %s', state.name)
             state.on(Event('exit', propagate=False))
             state.parent.state_stack.push(state)
             state.parent.state = state.parent.initial_state
@@ -228,9 +234,14 @@ class StateMachine(State):
         while state.parent and state != top_state:
             path.append(state)
             state = state.parent
+        on_top = True
         for state in reversed(path):
+            log.debug('entering %s', state.name)
             state.on(Event('enter', propagate=False))
             state.parent.state = state
+            if on_top:
+                on_top = False
+                continue
             state.parent.state_stack.push(state)
 
 
@@ -260,7 +271,7 @@ class Validator(object):
             if state in machine.states and machine is not self.state_machine:
                 msg = ('Machine "{0}" error: State "{1}" is already added '
                        'to machine "{2}"'.format(
-                            self.state_machine.name, state.name, machine.name))
+                       self.state_machine.name, state.name, machine.name))
                 self._raise(msg)
             for child_state in machine.states:
                 if isinstance(child_state, StateMachine):
@@ -270,15 +281,16 @@ class Validator(object):
         for added_state in self.state_machine.states:
             if added_state.initial is True and added_state is not state:
                 msg = ('Unable to set initial state to "{0}". '
-                        'Initial state is already set to "{1}"'
-                    .format(state.name, added_state.name))
+                       'Initial state is already set to "{1}"'
+                       .format(state.name, added_state.name))
                 self._raise(msg)
 
-    def validate_add_transition(self, from_state, to_state, events):
+    def validate_add_transition(self, from_state, to_state, events, input):
         root_machine = self.state_machine.root_machine
         self._validate_from_state(from_state)
         self._validate_to_state(to_state)
         self._validate_events(events)
+        self._validate_input(input)
 
     def _validate_from_state(self, from_state):
         root_machine = self.state_machine.root_machine
@@ -303,7 +315,13 @@ class Validator(object):
     def _validate_events(self, events):
         if not isinstance(events, collections.Iterable):
             msg = ('Unable to add transition, events is not iterable: {0}'
-                .format(events))
+                   .format(events))
+            self._raise(msg)
+
+    def _validate_input(self, input):
+        if not isinstance(input, collections.Iterable):
+            msg = ('Unable to add transition, input is not iterable: {0}'
+                   .format(input))
             self._raise(msg)
 
     def validate_initial_state(self, machine):

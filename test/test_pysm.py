@@ -2,6 +2,7 @@ import inspect
 import mock
 import pytest
 from pysm import Event, State, StateMachine, StateMachineException
+from pysm.pysm import Stack
 _e = Event
 
 
@@ -625,6 +626,19 @@ def test_events_not_iterable():
     assert expected in str(exc.value)
 
 
+def test_input_not_iterable():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    sm.add_state(s1)
+
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_transition(s1, None, events=[1], input=2)
+    expected = (
+        'Machine "sm" error: Unable to add transition, '
+        'input is not iterable: 2')
+    assert expected in str(exc.value)
+
+
 def test_add_not_a_state_instance():
     class NotState(object):
         pass
@@ -692,8 +706,155 @@ def test_add_state_that_is_already_added_anywhere_in_the_hsm():
 
 
 def test_state_stack():
-    pass
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    s2 = State('s2')
+    s3 = StateMachine('s3')
+    s31 = State('s31')
+    s32 = State('s32')
+
+    sm.add_state(s1, initial=True)
+    sm.add_state(s2)
+    sm.add_state(s3)
+    s3.add_state(s31, initial=True)
+    s3.add_state(s32)
+
+    sm.add_transition(s1, s2, events=['s1->s2'])
+    sm.add_transition(s2, s1, events=['s2->s1'])
+    sm.add_transition(s1, s3, events=['a'])
+    s3.add_transition(s31, s32, events=['b'])
+    sm.initialize()
+
+    assert sm.state == s1
+    assert sm.leaf_state == s1
+
+    sm.dispatch(_e('s1->s2'))
+    assert sm.state == s2
+    assert sm.leaf_state == s2
+    assert list(sm.state_stack.deque) == [s1]
+
+    sm.dispatch(_e('s2->s1'))
+    assert sm.state == s1
+    assert sm.leaf_state == s1
+    assert list(sm.state_stack.deque) == [s1, s2]
+
+    sm.dispatch(_e('a'))
+    assert sm.state == s3
+    assert sm.leaf_state == s31
+    assert s3.leaf_state == s31
+    assert list(sm.state_stack.deque) == [s1, s2, s1]
+    assert list(s3.state_stack.deque) == [s31]
+
+    sm.dispatch(_e('b'))
+    assert sm.state == s3
+    assert sm.leaf_state == s32
+    assert s3.state == s32
+    assert s3.leaf_state == s32
+    assert list(sm.state_stack.deque) == [s1, s2, s1]
+    assert list(s3.state_stack.deque) == [s31, s31]
+
+    # Brute force rollback of the previous state
+    s3.state = s3.state_stack.pop()
+    sm.state = sm.state_stack.pop()
+    assert sm.state == s1
+    assert sm.leaf_state == s1
+    assert s3.state == s31
+    assert s3.leaf_state == s31
+    assert list(sm.state_stack.deque) == [s1, s2]
+    assert list(s3.state_stack.deque) == [s31]
 
 
 def test_stack():
-    pass
+    stack = Stack()
+    stack.push(1)
+    stack.push(2)
+    stack.push(3)
+    assert repr(stack) == '[1, 2, 3]'
+    assert stack.peek() == 3
+    assert repr(stack) == '[1, 2, 3]'
+    assert stack.pop() == 3
+    assert repr(stack) == '[1, 2]'
+    assert stack.pop() == 2
+    assert repr(stack) == '[1]'
+    assert stack.pop() == 1
+    assert repr(stack) == '[]'
+    with pytest.raises(IndexError) as exc:
+        stack.pop()
+    expected = ('pop from an empty deque')
+    assert expected in str(exc.value)
+
+    tiny_stack = Stack(maxlen=2)
+    tiny_stack.push(1)
+    assert repr(tiny_stack) == '[1]'
+    tiny_stack.push(2)
+    assert repr(tiny_stack) == '[1, 2]'
+    tiny_stack.push(3)
+    assert repr(tiny_stack) == '[2, 3]'
+
+
+def test_transition_from_and_to_machine_itself():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    s2 = State('s2')
+    sm.add_state(s1, initial=True)
+    sm.add_state(s2)
+
+    sm.add_transition(sm, s1, events=['sm->s1'])
+    sm.add_transition(s1, sm, events=['s1->sm'])
+    sm.initialize()
+
+    assert sm.state == s1
+    sm.dispatch(_e('sm->s1'))
+    assert sm.state == s1
+    assert list(sm.state_stack.deque) == []
+    sm.dispatch(_e('s1->sm'))
+    assert sm.state == s1
+    assert list(sm.state_stack.deque) == [s1]
+    sm.dispatch(_e('sm->s1'))
+    assert sm.state == s1
+    assert list(sm.state_stack.deque) == [s1]
+    sm.dispatch(_e('s1->sm'))
+    assert sm.state == s1
+    assert list(sm.state_stack.deque) == [s1, s1]
+
+
+def test_add_transition_event_with_input():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    s2 = State('s2')
+    s3 = State('s3')
+    sm.add_state(s1, initial=True)
+    sm.add_state(s2)
+    sm.add_state(s3)
+
+    sm.add_transition(s1, s2, events=['a'], input=['go_to_s2'])
+    sm.add_transition(s1, s3, events=['a'], input=['go_to_s3'])
+    sm.add_transition(s2, s1, events=['a'])
+    sm.add_transition(s3, s1, events=['a'])
+    sm.initialize()
+
+    assert sm.state == s1
+    sm.dispatch(_e('a', input='go_to_s2'))
+    assert sm.state == s2
+    sm.dispatch(_e('a'))
+    assert sm.state == s1
+    sm.dispatch(_e('a', input='go_to_s3'))
+    assert sm.state == s3
+    sm.dispatch(_e('a'))
+    assert sm.state == s1
+
+
+def test_event_repr():
+    data = {'data_key': 'data_value'}
+    event = _e('test_event', input='test_input', key='value', data=data)
+    # WARNING: This may fail if Python implementation changes the ordering of
+    # items in the dictionary. CPython should be fine though.
+    expected = ("<Event test_event, input=test_input, cargo={'data':"
+        " {'data_key': 'data_value'}, 'key': 'value'}")
+    assert expected in repr(event)
+
+
+def test_state_repr():
+    state = State('test_state')
+    expected = "State test_state (0x"
+    assert expected in repr(state)
