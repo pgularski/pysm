@@ -8,6 +8,7 @@ _e = Event
 
 # log.setLevel(logging.DEBUG)
 
+
 def test_new_sm():
     run_call_mock = mock.Mock()
     stop_call_mock = mock.Mock()
@@ -886,7 +887,7 @@ def test_event_repr():
     # WARNING: This may fail if Python implementation changes the ordering of
     # items in the dictionary. CPython should be fine though.
     expected = ("<Event test_event, input=test_input, cargo={'data':"
-        " {'data_key': 'data_value'}, 'key': 'value'}")
+                " {'data_key': 'data_value'}, 'key': 'value'}")
     assert expected in repr(event)
 
 
