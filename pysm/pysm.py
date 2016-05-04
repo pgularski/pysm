@@ -234,15 +234,10 @@ class StateMachine(State):
         while state.parent and state != top_state:
             path.append(state)
             state = state.parent
-        on_top = True
         for state in reversed(path):
             log.debug('entering %s', state.name)
             state.on(Event('enter', propagate=False))
             state.parent.state = state
-            if on_top:
-                on_top = False
-                continue
-            state.parent.state_stack.push(state)
 
 
 class Validator(object):
@@ -293,10 +288,7 @@ class Validator(object):
         self._validate_input(input)
 
     def _validate_from_state(self, from_state):
-        root_machine = self.state_machine.root_machine
-        if from_state is root_machine:
-            return
-        elif not from_state.is_substate(root_machine):
+        if from_state not in self.state_machine.states:
             msg = 'Unable to add transition from unknown state "{0}"'.format(
                 from_state.name)
             self._raise(msg)

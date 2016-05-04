@@ -1,10 +1,12 @@
 import inspect
 import mock
 import pytest
-from pysm import Event, State, StateMachine, StateMachineException
-from pysm.pysm import Stack
+import pysm
+import logging
+from pysm import Event, State, StateMachine, StateMachineException, Stack, log
 _e = Event
 
+# log.setLevel(logging.DEBUG)
 
 def test_new_sm():
     run_call_mock = mock.Mock()
@@ -743,7 +745,7 @@ def test_state_stack():
     assert sm.leaf_state == s31
     assert s3.leaf_state == s31
     assert list(sm.state_stack.deque) == [s1, s2, s1]
-    assert list(s3.state_stack.deque) == [s31]
+    assert list(s3.state_stack.deque) == []
 
     sm.dispatch(_e('b'))
     assert sm.state == s3
@@ -751,7 +753,7 @@ def test_state_stack():
     assert s3.state == s32
     assert s3.leaf_state == s32
     assert list(sm.state_stack.deque) == [s1, s2, s1]
-    assert list(s3.state_stack.deque) == [s31, s31]
+    assert list(s3.state_stack.deque) == [s31]
 
     # Brute force rollback of the previous state
     s3.state = s3.state_stack.pop()
@@ -761,7 +763,37 @@ def test_state_stack():
     assert s3.state == s31
     assert s3.leaf_state == s31
     assert list(sm.state_stack.deque) == [s1, s2]
-    assert list(s3.state_stack.deque) == [s31]
+    assert list(s3.state_stack.deque) == []
+
+
+def test_state_stack_high_tree():
+    sm = StateMachine('sm')
+    s0 = StateMachine('s0')
+    s01 = StateMachine('s01')
+    s011 = StateMachine('s011')
+    s0111 = State('s0111')
+    s0112 = State('s0112')
+    s0113 = StateMachine('s0113')
+    s01131 = State('s01131')
+
+    sm.add_state(s0, initial=True)
+    s0.add_state(s01, initial=True)
+    s01.add_state(s011, initial=True)
+    s011.add_state(s0111, initial=True)
+    s011.add_state(s0112)
+    s011.add_state(s0113)
+    s0113.add_state(s01131, initial=True)
+
+    s011.add_transition(s0111, s0113, events=['a'])
+    sm.initialize()
+
+    assert sm.leaf_state == s0111
+    sm.dispatch(_e('a'))
+    assert list(sm.state_stack.deque) == []
+    assert list(s0.state_stack.deque) == []
+    assert list(s01.state_stack.deque) == []
+    assert list(s011.state_stack.deque) == [s0111]
+    assert list(s0113.state_stack.deque) == []
 
 
 def test_stack():
@@ -799,7 +831,11 @@ def test_transition_from_and_to_machine_itself():
     sm.add_state(s1, initial=True)
     sm.add_state(s2)
 
-    sm.add_transition(sm, s1, events=['sm->s1'])
+    with pytest.raises(StateMachineException) as exc:
+        sm.add_transition(sm, s1, events=['sm->s1'])
+    expected = (
+        'Machine "sm" error: Unable to add transition from unknown state "sm"')
+    assert expected in str(exc.value)
     sm.add_transition(s1, sm, events=['s1->sm'])
     sm.initialize()
 
