@@ -281,7 +281,6 @@ class Validator(object):
                 self._raise(msg)
 
     def validate_add_transition(self, from_state, to_state, events, input):
-        root_machine = self.state_machine.root_machine
         self._validate_from_state(from_state)
         self._validate_to_state(to_state)
         self._validate_events(events)
