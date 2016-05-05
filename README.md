@@ -62,19 +62,19 @@ s0.add_transition(s1, s2, events='c')
 s0.add_transition(s2, None, events='k', action=action_k)
 s0.add_transition(s2, s11, events='f')
 s0.add_transition(s2, s1, events='c')
-s1.add_transition(s11, None, events='h', condition=lambda e: foo is True, action=unset_foo)
+s1.add_transition(s11, None, events='h', condition=is_foo, action=unset_foo)
 s1.add_transition(s11, None, events='n', action=action_n)
 s1.add_transition(s11, s211, events='g')
 s21.add_transition(s211, None, events='m', action=action_m)
 s21.add_transition(s211, s0, events='g')
 s21.add_transition(s211, s21, events='d')
-s2.add_transition(s21, None, events='l', condition=lambda e: foo is True, action=action_l)
+s2.add_transition(s21, None, events='l', condition=is_foo, action=action_l)
 s2.add_transition(s21, s211, events='b')
-s2.add_transition(s21, s21, events='h', condition=lambda e: foo is False, action=set_foo)
+s2.add_transition(s21, s21, events='h', condition=is_foo, action=set_foo)
 sm.add_transition(s0, None, events='i', action=action_i)
 sm.add_transition(s0, s211, events='e')
 
 sm.initialize()
 
-# See UTs to see it working
+# See it working in UTs
 ```
