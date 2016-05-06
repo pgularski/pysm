@@ -106,6 +106,7 @@ class StateMachine(State):
         self.state = None
         self._transitions = TransitionsContainer(self)
         self.state_stack = Stack(maxlen=32)
+        self.leaf_state_stack = Stack(maxlen=32)
         self.stack = Stack()
         self.validator = Validator(self)
 
@@ -214,6 +215,8 @@ class StateMachine(State):
         transition['after'](event)
 
     def _exit_states(self, event, from_state, to_state):
+        # TODO: Either remove event argument or create it above
+        self.leaf_state_stack.push(self.leaf_state)
         state = self.leaf_state
         while (state.parent and
                 not (from_state.is_substate(state) and
@@ -238,6 +241,23 @@ class StateMachine(State):
             log.debug('entering %s', state.name)
             state.on(Event('enter', propagate=False))
             state.parent.state = state
+
+    def set_previous_leaf_state(self):
+        from_state = self.leaf_state
+        try:
+            to_state = self.leaf_state_stack.peek()
+        except IndexError:
+            return
+        event=None
+        top_state = self._exit_states(event, from_state, to_state)
+        self._enter_states(event, top_state, to_state)
+
+    def revert_to_previous_leaf_state(self):
+        self.set_previous_leaf_state()
+        try:
+            self.leaf_state_stack.pop()
+        except IndexError:
+            return
 
 
 class Validator(object):

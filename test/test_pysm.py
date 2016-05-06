@@ -794,7 +794,9 @@ def test_state_stack_high_tree():
     assert list(s0.state_stack.deque) == []
     assert list(s01.state_stack.deque) == []
     assert list(s011.state_stack.deque) == [s0111]
+    assert list(s011.leaf_state_stack.deque) == []
     assert list(s0113.state_stack.deque) == []
+    assert list(sm.leaf_state_stack.deque) == [s0111]
 
 
 def test_stack():
@@ -895,3 +897,103 @@ def test_state_repr():
     state = State('test_state')
     expected = "State test_state (0x"
     assert expected in repr(state)
+
+
+def test_transition_to_history():
+    oven = StateMachine('Oven')
+    door_closed = StateMachine('DoorClosed')
+    door_open = State('DoorOpen')
+    heating = StateMachine('Heating')
+    toasting = State('Toasting')
+    baking = State('Baking')
+    off = State('Off')
+
+    oven.add_state(door_closed, initial=True)
+    oven.add_state(door_open)
+    door_closed.add_state(off, initial=True)
+    door_closed.add_state(heating)
+    heating.add_state(baking, initial=True)
+    heating.add_state(toasting)
+
+    oven.add_transition(door_closed, toasting, events=['toast'])
+    oven.add_transition(door_closed, baking, events=['bake'])
+    oven.add_transition(door_closed, off, events=['off', 'timeout'])
+    oven.add_transition(door_closed, door_open, events=['open'])
+
+    door_open.handlers = {'close': lambda e: oven.set_previous_leaf_state()}
+
+    oven.initialize()
+
+    assert oven.leaf_state == off
+    oven.dispatch(_e('open'))
+    assert oven.leaf_state == door_open
+    try:
+        oven.dispatch(_e('close'))
+    except Exception as exc:
+        assert not exc
+    assert oven.leaf_state == off
+    assert list(oven.leaf_state_stack.deque) == [off, door_open]
+
+    oven.dispatch(_e('bake'))
+    assert oven.leaf_state == baking
+    oven.dispatch(_e('open'))
+    assert oven.leaf_state == door_open
+    try:
+        oven.dispatch(_e('close'))
+    except Exception as exc:
+        assert not exc
+    assert oven.leaf_state == baking
+    expected = [off, door_open, off, baking, door_open]
+    assert list(oven.leaf_state_stack.deque) == expected
+
+
+def test_set_previous_state_no_history():
+    m = StateMachine('m')
+    off = State('Off')
+    m.add_state(off, initial=True)
+    m.initialize()
+    off.handlers = {'test_no_history': lambda e: m.set_previous_leaf_state()}
+
+    assert m.leaf_state == off
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == off
+    assert list(m.leaf_state_stack.deque) == []
+
+
+def test_revert_to_previous_state():
+    m = StateMachine('m')
+    off = State('Off')
+    on = State('On')
+    m.add_state(off, initial=True)
+    m.add_state(on)
+    m.add_transition(on, off, events=['off'])
+    m.add_transition(off, on, events=['on'])
+    m.initialize()
+    off.handlers = {
+        'test_no_history': lambda e: m.revert_to_previous_leaf_state()
+    }
+
+    assert m.leaf_state == off
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == off
+    assert list(m.leaf_state_stack.deque) == []
+
+    m.dispatch(_e('on'))
+    assert m.leaf_state == on
+    assert list(m.leaf_state_stack.deque) == [off]
+    m.dispatch(_e('off'))
+    assert m.leaf_state == off
+    assert list(m.leaf_state_stack.deque) == [off, on]
+
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == on
+    assert list(m.leaf_state_stack.deque) == [off, on]
