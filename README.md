@@ -17,6 +17,15 @@ Python State Machine
 - Fast (even with hundreds of transition rules)
 - Not too many pythonisms, so that it's easily portable to other languages (ie. JavaScript)
 
+# Installation
+```
+pip install pysm
+```
+or clone this repository and then
+```
+python setup.py install
+```
+
 --
 It can do this:
 
