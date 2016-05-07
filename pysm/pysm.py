@@ -17,10 +17,10 @@ class StateMachineException(Exception):
 
 
 class Event(object):
-    def __init__(self, name, input=None, **cargo):
+    def __init__(self, name, input=None, propagate=True, **cargo):
         self.name = name
         self.input = input
-        self.propagate = True
+        self.propagate = propagate
         self.cargo = cargo
 
     def __repr__(self):
