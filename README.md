@@ -10,10 +10,12 @@ Python State Machine
 - States history
 - Conditional transitions (if/elif/else-like logic)
 - An object may contain many state machines
-- Fast
 - Easy to use
 - Explicit behaviour (no method or attribute is added to the object containing a state machine)
-- No need to extend a class with State Machine class (composition over inheritance), however, one can extend the Event class to always contain the entity object.
+- No need to extend a class with State Machine class (composition over inheritance), however, one can extend the Event class to always contain the entity object
+- Entry and exit actions are associated with states, not transitions
+- Fast (even with hundreds of transition rules)
+- Not too many pythonisms, so that it's easily portable to other languages (ie. JavaScript)
 
 --
 It can do this:
