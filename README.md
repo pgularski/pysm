@@ -36,14 +36,11 @@ There's usually one problem with them, though - quite often they have too much m
 That said, explicit is better than implicit. And simple is better than complex. These are the main ideas behind this (yet another) state machine implementation. And also, debugging the state machine itself and code that uses it is a breeze.
 
 # Examples
---
-It can do this:
 
 ## Simple FSM (Finite State Machine)
 
 ![alt tag](https://cloud.githubusercontent.com/assets/3026621/15031178/bf5efb2a-124e-11e6-9748-0b5a5be60a30.png)
 
-Like that:
 ```python
 from pysm import State, StateMachine, Event
 
@@ -66,13 +63,9 @@ sm.dispatch(Event('on'))
 assert sm.state == on
 ```
 
-Or this:
-
 ## HSM (Hierarchical State Machine)
 
 ![alt tag](https://cloud.githubusercontent.com/assets/3026621/15031148/ad955f06-124e-11e6-865e-c7e3340f14cb.png)
-
-Like that:
 
 ```python
 # ... action functions go here
