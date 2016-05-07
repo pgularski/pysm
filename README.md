@@ -1,7 +1,9 @@
 # pysm
 Python State Machine
 
-==
+# Status
+[![Build Status](https://travis-ci.org/pgularski/pysm.png?branch=master)](https://travis-ci.org/pgularski/pysm)
+
 # Features
 - Finite State Machine (FSM)
 - Hierarchical State Machine (HSM) with Internal/External/Local transitions
