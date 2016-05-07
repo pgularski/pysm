@@ -3,6 +3,6 @@ python:
   - "2.7"
   - "2.6"
 install:
-    - pip install pytest, pytest-cov, mock
+    - pip install pytest>=2.9.1, pytest-cov>=2.2.1, mock>=2.0.0
 script:  python setup.py test
 sudo: false
