@@ -1,9 +1,8 @@
 # pysm
 Python State Machine
 
-## Status
+# Status
 [![Build Status](https://travis-ci.org/pgularski/pysm.png?branch=master)](https://travis-ci.org/pgularski/pysm)
-
 
 # Features
 - Finite State Machine (FSM)
