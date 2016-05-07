@@ -1,6 +1,21 @@
 # pysm
 Python State Machine
 
+==
+# Features
+- Finite State Machine (FSM)
+- Hierarchical State Machine (HSM) with Internal/External/Local transitions
+- Pushdown Automaton (PDA)
+- States history
+- Conditional transitions (if/elif/else-like logic)
+- Independent state event handling. States can handle events even if the event isn't bound to a transition (very useful in certain use cases - ie "update" function in game loop). Similar (but not identical) to the State Pattern.
+- SM is not bound to the object (composition over inheritance), however, one can extend the Event class to always contain the entity object.
+- An object may contain many state machines.
+- Fast
+- Easy to use
+- Explicit behaviour
+- Transition hooks - enter, exit, action, before, after
+
 --
 It can do this:
 
