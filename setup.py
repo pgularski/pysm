@@ -31,7 +31,21 @@ setup(
     license='MIT',
     packages=find_packages(),
     zip_safe=True,
-
     tests_require=['pytest', 'pytest-cov', 'mock'],
     cmdclass={'test': PyTest},
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Environment :: Console',
+        'Intended Audience :: Developers',
+        'Intended Audience :: Education',
+        'Intended Audience :: Information Technology',
+        'Intended Audience :: Telecommunications Industry',
+        'Natural Language :: English',
+        'Topic :: Software Development',
+        'Topic :: Software Development :: Libraries',
+    ],
 )
