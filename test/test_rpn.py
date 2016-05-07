@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 '''
-Test StateMachine can act as Pushdown Automata.
+Test StateMachine can act as Pushdown Automaton.
 '''
 
 import string
@@ -22,15 +22,15 @@ class Calculator(object):
         sm.add_transition(initial, number,
                           events=['parse'], input=string.digits,
                           action=self.start_building_number)
-        sm.add_transition(number, number,
+        sm.add_transition(number, None,
                           events=['parse'], input=string.digits,
                           action=self.build_number)
         sm.add_transition(number, initial,
                           events=['parse'], input=string.whitespace)
-        sm.add_transition(initial, initial,
+        sm.add_transition(initial, None,
                           events=['parse'], input='+-*/',
                           action=self.do_operation)
-        sm.add_transition(initial, initial,
+        sm.add_transition(initial, None,
                           events=['parse'], input='=',
                           action=self.do_equal)
         sm.initialize()
