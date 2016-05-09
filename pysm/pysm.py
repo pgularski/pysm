@@ -22,6 +22,8 @@ class Event(object):
         self.input = input
         self.propagate = propagate
         self.cargo = cargo
+        # This must be always the root machine
+        self.state_machine = None
 
     def __repr__(self):
         return '<Event {0}, input={1}, cargo={2} ({3})>'.format(
@@ -55,10 +57,12 @@ class State(object):
 
     def on(self, event):
         if event.name in self.handlers:
-            return self.handlers[event.name](event)
-        elif self.parent and event.propagate:
-            return self.parent.on(event)
-        return self._nop(event)
+            event.propagate = False
+            self.handlers[event.name](event)
+        # Never propagate exit/enter events, even if propagate is set to True
+        if (self.parent and event.propagate and
+                event.name not in ['exit', 'enter']):
+            self.parent.on(event)
 
     def _nop(self, event):
         return True
@@ -198,6 +202,7 @@ class StateMachine(State):
                     machines.append(child_state)
 
     def dispatch(self, event):
+        event.state_machine = self
         self.leaf_state.on(event)
         transition = self.get_transition(event)
         if transition is None:
@@ -224,7 +229,9 @@ class StateMachine(State):
                 or (state == from_state == to_state)
         ):
             log.debug('exiting %s', state.name)
-            state.on(Event('exit', propagate=False))
+            exit_event = Event('exit', propagate=False, source_event=event)
+            exit_event.state_machine = self
+            state.on(exit_event)
             state.parent.state_stack.push(state)
             state.parent.state = state.parent.initial_state
             state = state.parent
@@ -239,21 +246,24 @@ class StateMachine(State):
             state = state.parent
         for state in reversed(path):
             log.debug('entering %s', state.name)
-            state.on(Event('enter', propagate=False))
+            enter_event = Event('enter', propagate=False, source_event=event)
+            enter_event.state_machine = self
+            state.on(enter_event)
             state.parent.state = state
 
-    def set_previous_leaf_state(self):
+    def set_previous_leaf_state(self, event=None):
+        if event is not None:
+            event.state_machine = self
         from_state = self.leaf_state
         try:
             to_state = self.leaf_state_stack.peek()
         except IndexError:
             return
-        event=None
         top_state = self._exit_states(event, from_state, to_state)
         self._enter_states(event, top_state, to_state)
 
-    def revert_to_previous_leaf_state(self):
-        self.set_previous_leaf_state()
+    def revert_to_previous_leaf_state(self, event=None):
+        self.set_previous_leaf_state(event)
         try:
             self.leaf_state_stack.pop()
         except IndexError:

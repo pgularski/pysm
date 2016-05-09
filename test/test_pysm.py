@@ -997,3 +997,214 @@ def test_revert_to_previous_state():
         assert not exc
     assert m.leaf_state == on
     assert list(m.leaf_state_stack.deque) == [off, on]
+
+
+def test_event_propagate():
+    data = []
+
+    def do(event):
+        state = inspect.currentframe().f_back.f_locals['self']
+        event.cargo['data'].append(state)
+
+    def do_with_propagate(event):
+        state = inspect.currentframe().f_back.f_locals['self']
+        event.cargo['data'].append(state)
+        event.propagate = True
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s2 = StateMachine('s2')
+    s3 = StateMachine('s3')
+    s4 = State('s4')
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s2, initial=True)
+    s2.add_state(s3, initial=True)
+    s3.add_state(s4, initial=True)
+
+    for state in s0, s1, s2, s3, s4:
+        state.handlers = {'do': do}
+
+    m.initialize()
+
+    # No propagate by default
+    m.dispatch(_e('do', data=data))
+    assert data == [s4]
+
+    # Should propagate only to the next state that can handle the event
+    data = []
+    s4.handlers = {'do': do_with_propagate}
+    m.dispatch(_e('do', data=data))
+    assert data == [s4, s3]
+
+    data = []
+    s4.handlers = {'do': do_with_propagate}
+    s3.handlers = {}
+    m.dispatch(_e('do', data=data))
+    assert data == [s4, s2]
+
+    data = []
+    s4.handlers = {'do': do_with_propagate}
+    s3.handlers = {'do': do}
+    m.dispatch(_e('do', data=data))
+    assert data == [s4, s3]
+
+    data = []
+    s4.handlers = {}
+    s3.handlers = {}
+    m.dispatch(_e('do', data=data))
+    assert data == [s2]
+
+    data = []
+    s4.handlers = {}
+    s3.handlers = {}
+    s2.handlers = {'do': do_with_propagate}
+    m.dispatch(_e('do', data=data))
+    assert data == [s2, s1]
+
+
+def test_event_propagate_enter_exit():
+    data = []
+
+    def do(event):
+        state = inspect.currentframe().f_back.f_locals['self']
+        event.cargo['source_event'].cargo['data'].append(state)
+
+    def do_with_propagate(event):
+        state = inspect.currentframe().f_back.f_locals['self']
+        event.cargo['source_event'].cargo['data'].append(state)
+        event.propagate = True
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s2 = StateMachine('s2')
+    s3 = StateMachine('s3')
+    s4 = State('s4')
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s2, initial=True)
+    s2.add_state(s3, initial=True)
+    s3.add_state(s4, initial=True)
+
+    m.add_transition(s0, s0, events='a')
+
+    for state in s0, s1, s2, s3, s4:
+        state.handlers = {'enter': do, 'exit': do}
+
+    m.initialize()
+
+    m.dispatch(_e('a', data=data))
+    assert data == [s4, s3, s2, s1, s0, s0, s1, s2, s3, s4]
+
+    data = []
+    s1.handlers = {}
+    s3.handlers = {}
+    m.dispatch(_e('a', data=data))
+    assert data == [s4, s2, s0, s0, s2, s4]
+
+    # Never propagate exit/enter events, even if propagate is set to True
+    data = []
+    s4.handlers = {'enter': do_with_propagate, 'exit': do_with_propagate}
+    m.dispatch(_e('a', data=data))
+    assert data == [s4, s2, s0, s0, s2, s4]
+
+
+def test_previous_state_with_source_event():
+    def do(event):
+        state = inspect.currentframe().f_back.f_locals['self']
+        event.cargo['source_event'].cargo['data'].append(state)
+
+    def do_with_propagate(event):
+        state = inspect.currentframe().f_back.f_locals['self']
+        event.cargo['source_event'].cargo['data'].append(state)
+        event.propagate = True
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+    s12 = State('s12')
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s11, initial=True)
+    s1.add_state(s12)
+
+    for state in s0, s1, s11, s12:
+        state.handlers = {'enter': do, 'exit': do}
+
+    m.add_transition(s0, s12, events='a')
+
+    m.initialize()
+
+    data = []
+    assert list(m.leaf_state_stack.deque) == []
+    m.dispatch(_e('a', data=data))
+    assert list(m.leaf_state_stack.deque) == [s11]
+
+    data = []
+    m.set_previous_leaf_state(event=_e('a', data=data))
+    assert list(m.leaf_state_stack.deque) == [s11, s12]
+    assert data == [s12, s11]
+
+
+def test_previous_state_event_none():
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+    s12 = State('s12')
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s11, initial=True)
+    s1.add_state(s12)
+
+    m.add_transition(s0, s12, events='a')
+
+    m.initialize()
+
+    assert list(m.leaf_state_stack.deque) == []
+    m.dispatch(_e('a'))
+    assert list(m.leaf_state_stack.deque) == [s11]
+
+    try:
+        m.set_previous_leaf_state(event=None)
+    except Exception as exc:
+        assert not exc
+    assert list(m.leaf_state_stack.deque) == [s11, s12]
+
+
+def test_state_machine_reference_present_in_event_with_nested_machines():
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s2 = State('s2')
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s2, initial=True)
+
+    def do(event):
+        assert event.state_machine == m
+
+    for state in s0, s1, s2:
+        state.handlers = {'enter': do, 'exit': do, 'do': do}
+
+    m.add_transition(s0, s2, events=['do'])
+    m.initialize()
+    m.dispatch(_e('do'))
+
+
+def test_add_states():
+    # TODO Implement
+    pass
+
+
+def test_set_initial_state():
+    # TODO Implement
+    pass
