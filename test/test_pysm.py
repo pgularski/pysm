@@ -886,11 +886,11 @@ def test_add_transition_event_with_input():
 def test_event_repr():
     data = {'data_key': 'data_value'}
     event = _e('test_event', input='test_input', key='value', data=data)
-    # WARNING: This may fail if Python implementation changes the ordering of
-    # items in the dictionary. CPython should be fine though.
-    expected = ("<Event test_event, input=test_input, cargo={'data':"
+    expected_1 = ("<Event test_event, input=test_input, cargo={'data':"
                 " {'data_key': 'data_value'}, 'key': 'value'}")
-    assert expected in repr(event)
+    expected_2 = ("<Event test_event, input=test_input, cargo={'key':"
+                " 'value', 'data': {'data_key': 'data_value'}}")
+    assert (expected_1 in repr(event)) or (expected_2 in repr(event))
 
 
 def test_state_repr():
