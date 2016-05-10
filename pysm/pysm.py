@@ -220,7 +220,6 @@ class StateMachine(State):
         transition['after'](event)
 
     def _exit_states(self, event, from_state, to_state):
-        # TODO: Either remove event argument or create it above
         self.leaf_state_stack.push(self.leaf_state)
         state = self.leaf_state
         while (state.parent and
