@@ -198,8 +198,7 @@ def test_calc_callbacks():
 
 ## Transition to historical states
 
-![alt tag](https://cloud.githubusercontent.com/assets/3026621/15139510/6b29a642-168e-11e6-8338-ad6c950c2761.png)
-
+![alt tag](https://cloud.githubusercontent.com/assets/3026621/15139952/b5e58cee-1690-11e6-9313-8ace79d5a74e.png)
 
 ```python
 import threading
