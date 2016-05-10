@@ -1200,11 +1200,15 @@ def test_state_machine_reference_present_in_event_with_nested_machines():
     m.dispatch(_e('do'))
 
 
-def test_add_states():
-    # TODO Implement
-    pass
+def test_add_states_and_set_initial_state():
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s2 = State('s2')
 
-
-def test_set_initial_state():
-    # TODO Implement
-    pass
+    m.add_states(s0, s1, s2)
+    assert all(state in m.states for state in (s0, s1, s2))
+    assert m.initial_state is None
+    m.set_initial_state(s0)
+    m.initialize()
+    assert m.initial_state is s0
