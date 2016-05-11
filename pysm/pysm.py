@@ -112,10 +112,9 @@ class StateMachine(State):
         self.state_stack = Stack(maxlen=32)
         self.leaf_state_stack = Stack(maxlen=32)
         self.stack = Stack()
-        self.validator = Validator(self)
 
     def add_state(self, state, initial=False):
-        self.validator.validate_add_state(state, initial)
+        Validator(self).validate_add_state(state, initial)
         state.initial = initial
         state.parent = self
         self.states.add(state)
@@ -125,7 +124,7 @@ class StateMachine(State):
             self.add_state(state)
 
     def set_initial_state(self, state):
-        self.validator.validate_set_initial(state)
+        Validator(self).validate_set_initial(state)
         state.initial = True
 
     @property
@@ -156,7 +155,7 @@ class StateMachine(State):
         if condition is None:
             condition = self._nop
 
-        self.validator.validate_add_transition(
+        Validator(self).validate_add_transition(
             from_state, to_state, events, input)
 
         for input_value in input:
@@ -195,7 +194,7 @@ class StateMachine(State):
         machines.append(self)
         while machines:
             machine = machines.popleft()
-            self.validator.validate_initial_state(machine)
+            Validator(self).validate_initial_state(machine)
             machine.state = machine.initial_state
             for child_state in machine.states:
                 if isinstance(child_state, StateMachine):
