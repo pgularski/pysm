@@ -65,6 +65,7 @@ class State(object):
             self.parent.on(event)
 
     def _nop(self, event):
+        del event  # Unused
         return True
 
 
@@ -219,13 +220,12 @@ class StateMachine(State):
         transition['after'](event)
 
     def _exit_states(self, event, from_state, to_state):
-        self.leaf_state_stack.push(self.leaf_state)
         state = self.leaf_state
+        self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and
                      to_state.is_substate(state))
-                or (state == from_state == to_state)
-        ):
+                or (state == from_state == to_state)):
             log.debug('exiting %s', state.name)
             exit_event = Event('exit', propagate=False, source_event=event)
             exit_event.state_machine = self
@@ -294,7 +294,7 @@ class Validator(object):
             if state in machine.states and machine is not self.state_machine:
                 msg = ('Machine "{0}" error: State "{1}" is already added '
                        'to machine "{2}"'.format(
-                       self.state_machine.name, state.name, machine.name))
+                           self.state_machine.name, state.name, machine.name))
                 self._raise(msg)
             for child_state in machine.states:
                 if isinstance(child_state, StateMachine):
