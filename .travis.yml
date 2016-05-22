@@ -8,7 +8,7 @@ install:
     - pip install coveralls
     - pip install pylint
     - pip install pep8
-script: pylint --rcfile=.pylintrc pysm && pep8 && python setup.py test
+script: pylint --rcfile=.pylintrc pysm && pep8 pysm && python setup.py test
 sudo: false
 after_success:
   coveralls
