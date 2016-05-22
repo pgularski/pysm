@@ -224,8 +224,8 @@ class StateMachine(State):
         self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and
-                     to_state.is_substate(state))
-                or (state == from_state == to_state)):
+                     to_state.is_substate(state)) or
+                (state == from_state == to_state)):
             log.debug('exiting %s', state.name)
             exit_event = Event('exit', propagate=False, source_event=event)
             exit_event.state_machine = self
