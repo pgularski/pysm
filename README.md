@@ -18,7 +18,7 @@ Python State Machine
 - No need to extend a class with State Machine class (composition over inheritance), however, one can extend the Event class to always contain the entity object
 - Entry and exit actions are associated with states, not transitions
 - Fast (even with hundreds of transition rules)
-- Not too many pythonisms, so that it's easily portable to other languages (ie. JavaScript)
+- Not too many pythonisms, so that it's easily portable to other languages (ie. [JavaScript](https://github.com/pgularski/smjs)).
 
 # Installation
 ```
