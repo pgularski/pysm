@@ -29,20 +29,19 @@ class token(object):
 # Token list object - demonstrating the definition of state machine callbacks
 class tokenList(object):
     def __init__(self):
-        self.fss = None
         self.tokenList = []
         self.currentToken = None
 
-    def StartToken(self, event):
+    def StartToken(self, state, event):
         value = event.name
-        self.currentToken = token(self.fss.state.name)
+        self.currentToken = token(state.name)
         self.currentToken.addCharacter(value)
 
-    def addCharacter(self, event):
+    def addCharacter(self, state, event):
         value = event.name
         self.currentToken.addCharacter(value)
 
-    def EndToken(self, event):
+    def EndToken(self, state, event):
         value = event.name
         self.tokenList.append(self.currentToken)
         self.currentToken = None
@@ -145,7 +144,6 @@ def test():
     text = "    x123 = MyString + 123.65 - 'hello' * value "
     t = tokenList()
     parser = Parser(t)
-    t.fss = parser.sm
     parser.parse(text)
     expected = ('[Identifier<x123>, Operator<=>, Identifier<MyString>, '
                 'Operator<+>, Number<123.65>, Operator<->, String<hello>, '

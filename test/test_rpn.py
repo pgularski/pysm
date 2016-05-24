@@ -44,19 +44,19 @@ class Calculator(object):
         self.parse(string)
         return self.result
 
-    def start_building_number(self, event):
+    def start_building_number(self, state, event):
         digit = event.input
         self.sm.stack.push(int(digit))
         return True
 
-    def build_number(self, event):
+    def build_number(self, state, event):
         digit = event.input
         number = str(self.sm.stack.pop())
         number += digit
         self.sm.stack.push(int(number))
         return True
 
-    def do_operation(self, event):
+    def do_operation(self, state, event):
         operation = event.input
         y = self.sm.stack.pop()
         x = self.sm.stack.pop()
@@ -65,7 +65,7 @@ class Calculator(object):
         self.sm.stack.push(result)
         return True
 
-    def do_equal(self, event):
+    def do_equal(self, state, event):
         operation = event.input
         number = self.sm.stack.pop()
         self.result = number

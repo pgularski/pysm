@@ -6,10 +6,10 @@ from Queue import deque
 import logging
 import sys
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
-log.addHandler(handler)
-log.setLevel(logging.INFO)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 class StateMachineException(Exception):
@@ -58,14 +58,15 @@ class State(object):
     def on(self, event):
         if event.name in self.handlers:
             event.propagate = False
-            self.handlers[event.name](event)
+            self.handlers[event.name](self, event)
         # Never propagate exit/enter events, even if propagate is set to True
         if (self.parent and event.propagate and
                 event.name not in ['exit', 'enter']):
             self.parent.on(event)
 
-    def _nop(self, event):
-        del event  # Unused
+    def _nop(self, state, event):
+        del state  # Unused (silence pylint)
+        del event  # Unused (silence pylint)
         return True
 
 
@@ -82,8 +83,9 @@ class TransitionsContainer(object):
         return self._get_transition_matching_condition(key, event)
 
     def _get_transition_matching_condition(self, key, event):
+        from_state = self._machine.leaf_state
         for transition in self._transitions[key]:
-            if transition['condition'](event) is True:
+            if transition['condition'](from_state, event) is True:
                 return transition
 
 
@@ -203,30 +205,30 @@ class StateMachine(State):
 
     def dispatch(self, event):
         event.state_machine = self
-        self.leaf_state.on(event)
+        leaf_state_before = self.leaf_state
+        leaf_state_before.on(event)
         transition = self.get_transition(event)
         if transition is None:
             return
         to_state = transition['to_state']
         from_state = transition['from_state']
-        if to_state is None:
-            transition['action'](event)
-            return
 
-        transition['before'](event)
+        transition['before'](leaf_state_before, event)
         top_state = self._exit_states(event, from_state, to_state)
-        transition['action'](event)
+        transition['action'](leaf_state_before, event)
         self._enter_states(event, top_state, to_state)
-        transition['after'](event)
+        transition['after'](self.leaf_state, event)
 
     def _exit_states(self, event, from_state, to_state):
+        if to_state is None:
+            return
         state = self.leaf_state
         self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and
                      to_state.is_substate(state)) or
                 (state == from_state == to_state)):
-            log.debug('exiting %s', state.name)
+            logger.debug('exiting %s', state.name)
             exit_event = Event('exit', propagate=False, source_event=event)
             exit_event.state_machine = self
             state.on(exit_event)
@@ -236,6 +238,8 @@ class StateMachine(State):
         return state
 
     def _enter_states(self, event, top_state, to_state):
+        if to_state is None:
+            return
         path = []
         state = self._get_leaf_state(to_state)
 
@@ -243,7 +247,7 @@ class StateMachine(State):
             path.append(state)
             state = state.parent
         for state in reversed(path):
-            log.debug('entering %s', state.name)
+            logger.debug('entering %s', state.name)
             enter_event = Event('enter', propagate=False, source_event=event)
             enter_event.state_machine = self
             state.on(enter_event)

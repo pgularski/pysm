@@ -1,12 +1,12 @@
-import inspect
 import mock
 import pytest
 import pysm
 import logging
-from pysm import Event, State, StateMachine, StateMachineException, Stack, log
+from pysm import (Event, State, StateMachine, StateMachineException, Stack,
+                  logger)
 _e = Event
 
-# log.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
 
 
 def test_new_sm():
@@ -18,17 +18,17 @@ def test_new_sm():
 
     class Idling(State):
         # @event('run')
-        def run(self, event):
+        def run(self, state, event):
             run_call_mock(self, event.input, event.cargo)
 
-        def do(self, event):
+        def do(self, state, event):
             entity = event.cargo['entity']
             entity.do()
 
-        def on_enter(self, event):
+        def on_enter(self, state, event):
             idling_mock(self, 'on_enter')
 
-        def on_exit(self, event):
+        def on_exit(self, state, event):
             idling_mock(self, 'on_exit')
 
         def register_handlers(self):
@@ -39,23 +39,23 @@ def test_new_sm():
                 'exit': self.on_exit,
             }
 
-    def stop(event):
+    def stop(state, event):
         stop_call_mock('stopping...', event.cargo)
 
-    def do(event):
+    def do(state, event):
         entity = event.cargo['entity']
         entity.do()
 
-    def enter(event):
+    def enter(state, event):
         running_mock('running, enter')
 
-    def exit(event):
+    def exit(state, event):
         running_mock('running, exit')
 
-    def update(event):
+    def update(state, event):
         print 'update', event
 
-    def do_on_transition(event):
+    def do_on_transition(state, event):
         action_mock('action on transition')
 
     class Entity(object):
@@ -118,7 +118,7 @@ def test_conditions():
         def __init__(self):
             self.value = True
 
-        def get(self, event):
+        def get(self, state, event):
             return self.value
 
     bool_a = Bool()
@@ -197,10 +197,10 @@ def test_internal_transition():
             self.value = False
     foo = Foo()
 
-    def on_enter(event):
+    def on_enter(state, event):
         foo.value = True
 
-    def on_exit(event):
+    def on_exit(state, event):
         foo.value = True
 
     idling = State('idling')
@@ -292,14 +292,10 @@ def test_hsm_simple_hsm_transition():
 def test_enter_exit_on_transitions():
     test_list = []
 
-    def on_enter(event):
-        state = inspect.currentframe().f_back.f_locals['self']
-        # print 'entering', state
+    def on_enter(state, event):
         test_list.append(('enter', state))
 
-    def on_exit(event):
-        state = inspect.currentframe().f_back.f_locals['self']
-        # print 'exiting', state
+    def on_exit(state, event):
         test_list.append(('exit', state))
 
     m = StateMachine('m')
@@ -414,41 +410,39 @@ def test_internal_vs_external_transitions():
     class Foo(object):
         value = True
 
-    def on_enter(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def on_enter(state, event):
         test_list.append(('enter', state))
 
-    def on_exit(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def on_exit(state, event):
         test_list.append(('exit', state))
 
-    def set_foo(event):
+    def set_foo(state, event):
         Foo.value = True
         test_list.append('set_foo')
 
-    def unset_foo(event):
+    def unset_foo(state, event):
         Foo.value = False
         test_list.append('unset_foo')
 
-    def action_i(event):
+    def action_i(state, event):
         test_list.append('action_i')
         return True
 
-    def action_j(event):
+    def action_j(state, event):
         test_list.append('action_j')
         return True
 
-    def action_k(event):
+    def action_k(state, event):
         test_list.append('action_k')
         return True
 
-    def action_l(event):
+    def action_l(state, event):
         test_list.append('action_l')
 
-    def action_m(event):
+    def action_m(state, event):
         test_list.append('action_m')
 
-    def action_n(event):
+    def action_n(state, event):
         test_list.append('action_n')
         return True
 
@@ -497,13 +491,13 @@ def test_internal_vs_external_transitions():
     s0.add_transition(s2, None, events='k', action=action_k)
     s1.add_transition(s11, None, events='n', action=action_n)
     s1.add_transition(s11, None, events='h',
-                      condition=lambda e: Foo.value is True, action=unset_foo)
+                      condition=lambda s, e: Foo.value is True, action=unset_foo)
     s2.add_transition(s21, None, events='l',
-                      condition=lambda e: Foo.value is True, action=action_l)
+                      condition=lambda s, e: Foo.value is True, action=action_l)
     s21.add_transition(s211, None, events='m', action=action_m)
     # External transition
     s2.add_transition(s21, s21, events='h',
-                      condition=lambda e: Foo.value is False, action=set_foo)
+                      condition=lambda s, e: Foo.value is False, action=set_foo)
 
     m.initialize()
 
@@ -920,7 +914,7 @@ def test_transition_to_history():
     oven.add_transition(door_closed, off, events=['off', 'timeout'])
     oven.add_transition(door_closed, door_open, events=['open'])
 
-    door_open.handlers = {'close': lambda e: oven.set_previous_leaf_state()}
+    door_open.handlers = {'close': lambda s, e: oven.set_previous_leaf_state()}
 
     oven.initialize()
 
@@ -952,7 +946,7 @@ def test_set_previous_state_no_history():
     off = State('Off')
     m.add_state(off, initial=True)
     m.initialize()
-    off.handlers = {'test_no_history': lambda e: m.set_previous_leaf_state()}
+    off.handlers = {'test_no_history': lambda s, e: m.set_previous_leaf_state()}
 
     assert m.leaf_state == off
     try:
@@ -973,7 +967,7 @@ def test_revert_to_previous_state():
     m.add_transition(off, on, events=['on'])
     m.initialize()
     off.handlers = {
-        'test_no_history': lambda e: m.revert_to_previous_leaf_state()
+        'test_no_history': lambda s, e: m.revert_to_previous_leaf_state()
     }
 
     assert m.leaf_state == off
@@ -1002,12 +996,10 @@ def test_revert_to_previous_state():
 def test_event_propagate():
     data = []
 
-    def do(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def do(state, event):
         event.cargo['data'].append(state)
 
-    def do_with_propagate(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def do_with_propagate(state, event):
         event.cargo['data'].append(state)
         event.propagate = True
 
@@ -1068,12 +1060,10 @@ def test_event_propagate():
 def test_event_propagate_enter_exit():
     data = []
 
-    def do(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def do(state, event):
         event.cargo['source_event'].cargo['data'].append(state)
 
-    def do_with_propagate(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def do_with_propagate(state, event):
         event.cargo['source_event'].cargo['data'].append(state)
         event.propagate = True
 
@@ -1114,12 +1104,10 @@ def test_event_propagate_enter_exit():
 
 
 def test_previous_state_with_source_event():
-    def do(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def do(state, event):
         event.cargo['source_event'].cargo['data'].append(state)
 
-    def do_with_propagate(event):
-        state = inspect.currentframe().f_back.f_locals['self']
+    def do_with_propagate(state, event):
         event.cargo['source_event'].cargo['data'].append(state)
         event.propagate = True
 
@@ -1189,7 +1177,7 @@ def test_state_machine_reference_present_in_event_with_nested_machines():
     s0.add_state(s1, initial=True)
     s1.add_state(s2, initial=True)
 
-    def do(event):
+    def do(state, event):
         assert event.state_machine == m
 
     for state in s0, s1, s2:
@@ -1212,3 +1200,69 @@ def test_add_states_and_set_initial_state():
     m.set_initial_state(s0)
     m.initialize()
     assert m.initial_state is s0
+
+
+def test_state_instance_passed_to_an_event_handler():
+    def on_enter(state, event):
+        source_event = event.cargo['source_event']
+        source_event.cargo['test_list'].append(('enter', state))
+
+    def on_exit(state, event):
+        source_event = event.cargo['source_event']
+        source_event.cargo['test_list'].append(('exit', state))
+
+    def before(state, event):
+        assert state == s1
+
+    def action(state, event):
+        assert state == s1
+
+    def after(state, event):
+        assert state == s2
+
+    def on_internal(state, event):
+        assert state == s1
+
+    def do(state, event):
+        assert state == m
+
+    def condition(state, event):
+        assert state == s1
+        return True
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = State('s1')
+    s2 = State('s2')
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s0.add_state(s2)
+
+    m.add_transition(s0, s0, events='a')
+    s0.add_transition(s1, None, events=['internal'],
+        before=on_internal, action=on_internal, after=on_internal)
+    s0.add_transition(s1, s2, events='b',
+        before=before, action=action, after=after, condition=condition)
+    s0.add_transition(s2, s1, events='b')
+
+    for state in [m, s0, s1, s2]:
+        state.handlers = {'enter': on_enter, 'exit': on_exit}
+
+    m.handlers = {'do': do}
+
+    m.initialize()
+
+    test_list = []
+    m.dispatch(_e('a', test_list=test_list))
+    assert test_list == [('exit', s1), ('exit', s0), ('enter', s0), ('enter', s1)]
+
+    m.dispatch(_e('b', test_list=test_list))
+    m.dispatch(_e('do'))
+    m.dispatch(_e('b', test_list=test_list))
+
+    m.dispatch(_e('internal'))
+
+
+def enter_on_initialize():
+    # TODO: Do I want this behaviour? It's not implemented atm.
+    pass

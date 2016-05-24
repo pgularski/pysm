@@ -8,13 +8,13 @@ from pysm import StateMachine, State, Event
 
 # It's possible to encapsulate all state related behaviour in a state class.
 class HeatingState(StateMachine):
-    def on_enter(self, event):
+    def on_enter(self, state, event):
         oven = event.cargo['source_event'].cargo['oven']
         if not oven.timer.is_alive():
             oven.start_timer()
         print 'Heating on'
 
-    def on_exit(self, event):
+    def on_exit(self, state, event):
         print 'Heating off'
 
     def register_handlers(self):
@@ -92,15 +92,15 @@ class Oven(object):
         self.sm.dispatch(Event('timeout', oven=self))
         self.timer = threading.Timer(Oven.TIMEOUT, self.on_timeout)
 
-    def on_open_enter(self, event):
+    def on_open_enter(self, state, event):
         print 'Opening door'
         self.light_on()
 
-    def on_open_exit(self, event):
-        print 'Closing door'
+    def on_open_exit(self, state, event):
+        print 'Closing door',
         self.light_off()
 
-    def on_door_close(self, event):
+    def on_door_close(self, state, event):
         # Transition to a history state
         self.sm.set_previous_leaf_state(event)
 

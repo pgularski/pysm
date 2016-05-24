@@ -8,8 +8,9 @@ install:
     - pip install coveralls
     - pip install pylint
     - pip install pep8
-# script: pylint --rcfile=.pylintrc pysm && pep8 pysm && python setup.py test
-script: pep8 pysm && python setup.py test
+script:
+    - if [[ "$TRAVIS_PYTHON_VERSION" == "2.6" ]]; then pep8 pysm && python setup.py test ; fi
+    - if [[ "$TRAVIS_PYTHON_VERSION" != "2.6" ]]; then pylint --rcfile=.pylintrc pysm && pep8 pysm && python setup.py test ; fi
 sudo: false
 after_success:
   coveralls
