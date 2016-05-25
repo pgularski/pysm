@@ -31,8 +31,6 @@ setup(
     license='MIT',
     packages=find_packages(),
     zip_safe=True,
-    tests_require=['pytest', 'pytest-cov', 'mock'],
-    cmdclass={'test': PyTest},
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
@@ -48,4 +46,6 @@ setup(
         'Topic :: Software Development',
         'Topic :: Software Development :: Libraries',
     ],
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest', 'pytest-cov', 'mock'],
 )
