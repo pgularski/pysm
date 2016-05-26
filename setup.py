@@ -3,27 +3,12 @@
 
 
 from setuptools import setup, find_packages, Command
-
-
-class PyTest(Command):
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        import sys
-        import subprocess
-        errno = subprocess.call([sys.executable, 'runtests.py'])
-        raise SystemExit(errno)
+execfile('pysm/version.py')
 
 
 setup(
     name='pysm',
-    version='0.2.0',
+    version=__version__,
     url='https://github.com/pgularski/pysm',
     description='Python State Machine',
     author='Piotr Gularski',

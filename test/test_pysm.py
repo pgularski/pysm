@@ -3,7 +3,7 @@ import pytest
 import pysm
 import logging
 from pysm import (Event, State, StateMachine, StateMachineException, Stack,
-                  logger)
+                  logger, __version__)
 _e = Event
 
 # logger.setLevel(logging.DEBUG)
