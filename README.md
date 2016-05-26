@@ -2,8 +2,9 @@
 Python State Machine
 
 # Status
-[![Build Status](https://travis-ci.org/pgularski/pysm.png?branch=master)](https://travis-ci.org/pgularski/pysm)
+[![Build Status](https://travis-ci.org/pgularski/pysm.svg?branch=master)](https://travis-ci.org/pgularski/pysm)
 [![Coverage Status](https://coveralls.io/repos/github/pgularski/pysm/badge.svg?branch=master)](https://coveralls.io/github/pgularski/pysm?branch=master)
+[![Code Health](https://landscape.io/github/pgularski/pysm/master/landscape.svg?style=flat)](https://landscape.io/github/pgularski/pysm/master)
 
 # Features
 - Finite State Machine (FSM)
