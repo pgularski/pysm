@@ -881,9 +881,9 @@ def test_event_repr():
     data = {'data_key': 'data_value'}
     event = _e('test_event', input='test_input', key='value', data=data)
     expected_1 = ("<Event test_event, input=test_input, cargo={'data':"
-                " {'data_key': 'data_value'}, 'key': 'value'}")
+                  " {'data_key': 'data_value'}, 'key': 'value'}")
     expected_2 = ("<Event test_event, input=test_input, cargo={'key':"
-                " 'value', 'data': {'data_key': 'data_value'}}")
+                  " 'value', 'data': {'data_key': 'data_value'}}")
     assert (expected_1 in repr(event)) or (expected_2 in repr(event))
 
 
@@ -1240,9 +1240,9 @@ def test_state_instance_passed_to_an_event_handler():
 
     m.add_transition(s0, s0, events='a')
     s0.add_transition(s1, None, events=['internal'],
-        before=on_internal, action=on_internal, after=on_internal)
+                      before=on_internal, action=on_internal, after=on_internal)
     s0.add_transition(s1, s2, events='b',
-        before=before, action=action, after=after, condition=condition)
+                      before=before, action=action, after=after, condition=condition)
     s0.add_transition(s2, s1, events='b')
 
     for state in [m, s0, s1, s2]:
