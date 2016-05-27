@@ -12,10 +12,10 @@ class HeatingState(StateMachine):
         oven = event.cargo['source_event'].cargo['oven']
         if not oven.timer.is_alive():
             oven.start_timer()
-        print 'Heating on'
+        print('Heating on')
 
     def on_exit(self, state, event):
-        print 'Heating off'
+        print('Heating off')
 
     def register_handlers(self):
         self.handlers = {
@@ -67,10 +67,10 @@ class Oven(object):
         return self.sm.leaf_state.name
 
     def light_on(self):
-        print 'Light on'
+        print('Light on')
 
     def light_off(self):
-        print 'Light off'
+        print('Light off')
 
     def start_timer(self):
         self.timer.start()
@@ -88,16 +88,16 @@ class Oven(object):
         self.sm.dispatch(Event('close', oven=self))
 
     def on_timeout(self):
-        print 'Timeout...'
+        print('Timeout...')
         self.sm.dispatch(Event('timeout', oven=self))
         self.timer = threading.Timer(Oven.TIMEOUT, self.on_timeout)
 
     def on_open_enter(self, state, event):
-        print 'Opening door'
+        print('Opening door')
         self.light_on()
 
     def on_open_exit(self, state, event):
-        print 'Closing door',
+        print('Closing door')
         self.light_off()
 
     def on_door_close(self, state, event):
@@ -107,15 +107,15 @@ class Oven(object):
 
 def test_oven():
     oven = Oven()
-    print oven.state
+    print(oven.state)
     oven.bake()
-    print oven.state
+    print(oven.state)
     oven.open_door()
-    print oven.state
+    print(oven.state)
     oven.close_door()
-    print oven.state
+    print(oven.state)
     time.sleep(0.2)
-    print oven.state
+    print(oven.state)
 
 
 if __name__ == '__main__':
