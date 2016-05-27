@@ -1,9 +1,8 @@
 import os
 
 from setuptools import setup, find_packages, Command
-version_file = open(os.path.join('pysm', 'VERSION'))
-__version__ = version_file.read().strip()
-version_file.close()
+with open(os.path.join('pysm', 'VERSION')) as version_file:
+    __version__ = version_file.read().strip()
 
 setup(
     name='pysm',
