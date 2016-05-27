@@ -1,13 +1,7 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import collections
-from Queue import deque
+from collections import deque
 import logging
 import sys
-
-
-__version__ = '0.2.0'
 
 
 logger = logging.getLogger(__name__)

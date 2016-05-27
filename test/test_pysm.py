@@ -3,7 +3,7 @@ import pytest
 import pysm
 import logging
 from pysm import (Event, State, StateMachine, StateMachineException, Stack,
-                  logger, __version__)
+                  logger)
 _e = Event
 
 # logger.setLevel(logging.DEBUG)
@@ -53,14 +53,14 @@ def test_new_sm():
         running_mock('running, exit')
 
     def update(state, event):
-        print 'update', event
+        print('update', event)
 
     def do_on_transition(state, event):
         action_mock('action on transition')
 
     class Entity(object):
         def do(self):
-            print self, self.do
+            print(self, self.do)
 
     idling = Idling('idling')
     running = State('running')
@@ -125,7 +125,7 @@ def test_conditions():
     bool_b = Bool()
 
     def run(event):
-        print 'runninng...'
+        print('runninng...')
 
     idling = State('idling')
     running = State('running')
@@ -645,9 +645,7 @@ def test_add_not_a_state_instance():
 
     with pytest.raises(StateMachineException) as exc:
         sm.add_state(s1)
-    expected = (
-        'Machine "sm" error: Unable to add state of '
-        'type <class \'test_pysm.NotState\'>')
+    expected = ('Machine "sm" error: Unable to add state of type')
     assert expected in str(exc.value)
 
 

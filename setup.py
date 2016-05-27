@@ -1,10 +1,9 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
+import os
 
 from setuptools import setup, find_packages, Command
-execfile('pysm/version.py')
-
+version_file = open(os.path.join('pysm', 'VERSION'))
+__version__ = version_file.read().strip()
+version_file.close()
 
 setup(
     name='pysm',

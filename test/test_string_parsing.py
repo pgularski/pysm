@@ -105,9 +105,9 @@ class Parser(object):
         #     sm.add_transition(from_state, to_state, events=events,
         #             condition=condition, action=action)
 
-        alnum = string.letters + string.digits
+        alnum = string.ascii_letters + string.digits
         not_alnum = ''.join(set(string.printable)
-                            - set(string.letters + string.digits))
+                            - set(string.ascii_letters + string.digits))
         not_quote = ''.join(set(string.printable) - set(["'"]))
         not_digit_or_dot = ''.join(set(string.printable)
                                    - set(string.digits) - set(['.']))
@@ -115,7 +115,8 @@ class Parser(object):
 
         at = sm.add_transition
         at(start, start, events=string.whitespace)
-        at(start, identifier, events=string.letters, after=self.t.StartToken)
+        at(start, identifier,
+           events=string.ascii_letters, after=self.t.StartToken)
         at(start, operator, events='=+*/-()', after=self.t.StartToken)
         at(start, number, events=string.digits, after=self.t.StartToken)
         at(start, start_quote, events="'", after=self.t.StartToken)
