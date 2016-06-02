@@ -1,4 +1,7 @@
-'''
+'''The State Pattern, ah it solves so many problems and untangles the code.
+Yet it's a bit rigit. The goal of this library is to give you the close to the
+State Pattern feeling with much more flexibility.
+
 Explicit is better than implicit.
 Gives similar to the State Pattern feeling but way more flexible.
 
@@ -74,6 +77,8 @@ class Event(object):
         `enter` and `exit` events are never propagated, even if the `propagate`
         flag is set to `True` in a handler.
 
+    **Example Usage:**
+
     .. code-block:: python
 
         state_machine.dispatch(Event('start'))
@@ -100,11 +105,13 @@ class State(object):
     instances of this class. It is encouraged to extend this class to
     encapsulate a state behavior, similarly to the State Pattern.
 
-    :param name: Human readable name of a state
+    :param name: Human readable state name
     :type name: str
 
     :func:`pysm.State.register_handlers` hook to faciliate exteneding the
     :class:`pysm.State`.
+
+    **Example Usage:**
 
     .. code-block:: python
 
@@ -176,6 +183,7 @@ class State(object):
               triggered the transition) is passed in `event`'s cargo
               property as `cargo.source_event`.
 
+        **Example Usage:**
 
         .. code-block:: python
 
@@ -268,6 +276,9 @@ class StateMachine(State):
     StateMachine may be empty (with no states added to it), then it acts as a
     simple State.
 
+    :param name: Human readable state name
+    :type name: str
+
     :class:`pysm.StateMachine` extends :class:`pysm.State`
 
     '''
@@ -341,6 +352,43 @@ class StateMachine(State):
     def add_transition(
             self, from_state, to_state, events, input=None, action=None,
             condition=None, before=None, after=None):
+        '''Add transition to a state machine.
+
+        # TODO: Conditional if/elif/else transitions
+        # TODO: callback arguments
+
+        :param from_state: Source state
+        :type from_state: :class:`pysm.State`
+        :param to_state: Target state. If `None`, then it's an `internal
+            transition <https://en.wikipedia.org/wiki/UML_state_machine
+            #Internal_transitions>`_
+        :type to_state: :class:`pysm.State`, `None`
+        :param events: List of events that trigger the transition
+        :type events: :class:`collections.Iterable`
+            of :class:`collections.Hashable`
+        :param input: List of inputs that trigger the transition, may be `None`
+        :type input: `None`, :class:`collections.Iterable`
+            of :class:`collections.Hashable`
+        :param action: Action callback that is called during the transition
+            after all states have been left but before the new one is entered.
+        :type action: :class:`collections.Callable`
+        :param condition: Condition callback - if returns `True` transition may
+            be initiated.
+        :type condition: :class:`collections.Callable`
+        :param before: Action callback that is called right before the
+            transition.
+        :type before: :class:`collections.Callable`
+        :param after: Action callback that is called just after the transition
+        :type after: :class:`collections.Callable`
+
+        Internal transitions (the ones that actually do not cause a state
+        change or do not trigger enter/exit action) may be added by specyfying
+        `to_state` as `None`. The other way, more natural, but not as formal,
+        would be to just add a handler to a state, so there's no need to
+        specify a transition for every action. That, again, brings us closer to
+        the State Pattern.
+
+        '''
         # Rather than adding some if statements later on let's just declare a
         # neutral items that will do nothing if called. It simplifies the logic
         # a lot.
