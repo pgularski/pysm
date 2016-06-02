@@ -10,14 +10,14 @@ Python State Machine
 - Finite State Machine (FSM)
 - Hierarchical State Machine (HSM) with Internal/External/Local transitions
 - Pushdown Automaton (PDA)
-- Transition hooks - enter, exit, action, before, after
-- States history
-- Conditional transitions (if/elif/else-like logic)
-- An object may contain many state machines
-- Easy to use
-- Explicit behaviour (no method or attribute is added to the object containing a state machine)
-- No need to extend a class with State Machine class (composition over inheritance), however, one can extend the Event class to always contain the entity object
+- Transition hooks - action, before, after
+- State hooks - enter, exit, and any event handler one wishes to add to a state including handlers for special characters
 - Entry and exit actions are associated with states, not transitions
+- Events may be anything as long as they're hashable
+- States history and transition to previous states
+- Conditional transitions (if/elif/else-like logic)
+- Explicit behaviour (no method or attribute is added to the object containing a state machine)
+- No need to extend a class with State Machine class (composition over inheritance)
 - Fast (even with hundreds of transition rules)
 - Not too many pythonisms, so that it's easily portable to other languages (ie. [JavaScript](https://github.com/pgularski/smjs)).
 
@@ -35,6 +35,12 @@ There are a plethora of python state machine implementations out there. Some of 
 There's usually one problem with them, though - quite often they have too much magic under the hood. Specifically, they tend to add methods to a subject object, for instance. Using dynamic method creation seems apealing at first glance and it looks very well in simple demo examples. Yet the more mature the project gets the higher the risk someone is going to get bitten with this very feature. I have learned it the hard way. In most cases you don't want a dynamic property or method creation in your objects. And the further you get and more customers you have and APIs stabilise the more painful it gets when you realise you didn't want a certain item added to your instance in the first place. And then your dynamic code clashes with the API but it's too late to remove the dynamic code someone's relying on.
 
 That said, explicit is better than implicit. And simple is better than complex. These are the main ideas behind this (yet another) state machine implementation. And also, debugging the state machine itself and code that uses it is a breeze.
+
+Also I wanted a solution that:
+- can give one nearly the State Pattern feeling but is way more flexible
+- it's easy to use
+- accepts any type of event, i.e. one can add a handler for '%' character and bind it to a function (many libraries require an event to be a string that is converted dynamically to a function name which is then bound to an object). This makes string parsing simpler, no need to translate your input to something that a machine would understand.
+
 
 # Examples
 
@@ -207,7 +213,11 @@ import time
 from pysm import StateMachine, State, Event
 
 
-# It's possible to encapsulate all state related behaviour in a state class
+# It's possible to encapsulate all state related behaviour in a state class.
+# Pretty much like in the State Pattern. StateMachine is a sublass of State.
+# No need to create __init__ method, as the one in State has a hook method
+# ``register_handlers`` that one can create and add a needed extention logic to
+# it.
 class HeatingState(StateMachine):
     def on_enter(self, state, event):
         oven = event.cargo['source_event'].cargo['oven']
@@ -254,6 +264,8 @@ class Oven(object):
         oven.add_transition(door_closed, door_open, events=['open'])
 
         # This time, a state behaviour is handled by Oven's methods.
+        # No need to add the ``close`` event to transitions, it will be handled
+        # by the state anyway (provided the current state is door_open)
         door_open.handlers = {
             'enter': self.on_open_enter,
             'exit': self.on_open_exit,

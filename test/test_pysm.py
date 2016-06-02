@@ -251,7 +251,7 @@ def test_hsm_get_transition():
     s0.add_state(s1, initial=True)
     s1.add_state(s11, initial=True)
     sm.initialize()
-    transition = sm.get_transition(_e('a'))
+    transition = sm._get_transition(_e('a'))
     assert s1 == transition['from_state']
     assert s2 == transition['to_state']
 
@@ -1259,6 +1259,44 @@ def test_state_instance_passed_to_an_event_handler():
     m.dispatch(_e('b', test_list=test_list))
 
     m.dispatch(_e('internal'))
+
+
+def test_state_can_handle_hashable_types():
+    my_mock = mock.Mock()
+    test_set = frozenset([1, 2])
+
+    m = StateMachine('m')
+    s0 = State('s0')
+    s1 = State('s1')
+
+    m.add_state(s0, initial=True)
+    m.add_state(s1)
+
+    def do(state, event):
+        my_mock(state, event.name)
+        assert event.state_machine == m
+
+    for state in s0, s1:
+        state.handlers = {
+            '&': do,
+            frozenset([1,2]): do
+        }
+
+    m.add_transition(s0, s1, events=['&', test_set])
+    m.add_transition(s1, s0, events=['&', test_set])
+    m.initialize()
+    assert m.leaf_state == s0
+    m.dispatch(_e('&'))
+    assert m.leaf_state == s1
+    assert my_mock.call_args[0] == (s0, '&')
+    m.dispatch(_e(test_set))
+    assert m.leaf_state == s0
+    assert my_mock.call_args[0] == (s1, test_set)
+    m.dispatch(_e(test_set))
+    assert m.leaf_state == s1
+    m.dispatch(_e('&'))
+    assert m.leaf_state == s0
+    assert my_mock.call_count == 4
 
 
 def enter_on_initialize():
