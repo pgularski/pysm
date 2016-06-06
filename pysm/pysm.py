@@ -8,42 +8,17 @@ if needed, the full state machine functionality, including `FSM
 #Hierarchically_nested_states>`_, `PDA
 <https://en.wikipedia.org/wiki/Pushdown_automaton>`_ and other tasty things.
 
-
 Goals:
     - Provide a State Pattern-like behavior with more flexibility
     - Be explicit and don't add any code to objects
-    - Handle directly any kind of event (not only strings)
+    - Handle directly any kind of event (not only strings) - parsing strings is
+      cool again!
+    - Keep it simple, even for someone who's not very familiar with the FSM
+      terminology
 
-Give a comparison between the State Pattern and this state machine.
+.. note::
 
-Every state is is saved on the stack of states
-A stack may be used in a PDA
-
-For the sake of speed thread safety isn't guaranteed.
-
-May be used as a flat FSM.
-
-Some terminology:
-    PDA and stack
-    leaf state stack
-    leaf state
-    previous leaf state
-
-Some design decisions:
-    |StateMachine| is a subclass of |State|
-
-Examples to add:
-    - Flat FSM for those who don't need HSMs
-    - How to pass the entity object
-    - Getting source event from enter/exit
-    - using if/elif/else conditions
-    - Using input
-
-Advanced topics:
-    - How data is stored
-    - How add_transition splits the input internally
-    - Thread safety
-    - Complexity
+    For the sake of speed thread safety isn't guaranteed.
 
 ----
 
@@ -52,7 +27,6 @@ Advanced topics:
 .. |Hashable| replace:: :class:`~collections.Hashable`
 .. |Iterable| replace:: :class:`~collections.Iterable`
 .. |Callable| replace:: :class:`~collections.Callable`
-
 
 '''
 import collections
@@ -85,7 +59,8 @@ class Event(object):
 
         .. attribute:: state_machine
 
-            |StateMachine| instance in the states hierarchy.
+            A |StateMachine| instance that is handling the event (the one whose
+            :func:`pysm.StateMachine.dispatch` method is called)
 
         .. attribute:: propagate
 
@@ -134,15 +109,15 @@ class Event(object):
 class State(object):
     '''Represents a state in a state machine.
 
-    `enter` and `exit` actions are called whenever a state is entered or
+    `enter` and `exit` handlers are called whenever a state is entered or
     exited respectively. These action names are reserved only for this purpose.
 
     It is encouraged to extend this class to encapsulate a state behavior,
     similarly to the State Pattern.
 
-    Once it's extended, the preferred way of adding event handlers is through
-    the :func:`~pysm.State.register_handlers` hook. Usually, there's no need
-    to create the :func:`__init__` in a subclass.
+    Once it's extended, the preferred way of adding an event handlers is
+    through the :func:`~pysm.State.register_handlers` hook. Usually, there's no
+    need to create the :func:`__init__` in a subclass.
 
     :param name: Human readable state name
     :type name: str
