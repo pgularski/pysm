@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages, Command
 
-__version__ = '0.2.4'
+# Get __version__
+exec(open('pysm/version.py').read())
 
 setup(
     name='pysm',
