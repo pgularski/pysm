@@ -31,3 +31,4 @@ Goals:
    quickstart
    installing
    user_guide
+   cookbook
