@@ -19,6 +19,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.pardir))
+# sys.path.insert(0, os.path.abspath(os.pardir + os.path.sep + 'pysm'))
 
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
@@ -33,7 +34,11 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'sphinx.ext.extlinks',

@@ -1,8 +1,8 @@
-'''Ah, `The State Pattern <https://en.wikipedia.org/wiki/State_pattern>`_,
-it solves so many problems, untangles the code and saves one's sanity.
-Yet.., it's a bit rigid and doesn't scale. The goal of this library is to give
-you the close to the State Pattern simplicity with much more flexibility. And,
-if needed, the full state machine functionality, including `FSM
+'''Python State Machine
+
+The goal of this library is to give you a close to the State Pattern
+simplicity with much more flexibility. And, if needed, the full state machine
+functionality, including `FSM
 <https://en.wikipedia.org/wiki/Finite-state_machine>`_, `HSM
 <https://en.wikipedia.org/wiki/UML_state_machine
 #Hierarchically_nested_states>`_, `PDA
@@ -16,14 +16,10 @@ Goals:
     - Keep it simple, even for someone who's not very familiar with the FSM
       terminology
 
-.. note::
-
-    For the sake of speed thread safety isn't guaranteed.
-
 ----
 
-.. |StateMachine| replace:: :class:`~pysm.StateMachine`
-.. |State| replace:: :class:`~pysm.State`
+.. |StateMachine| replace:: :class:`~.StateMachine`
+.. |State| replace:: :class:`~.State`
 .. |Hashable| replace:: :class:`~collections.Hashable`
 .. |Iterable| replace:: :class:`~collections.Iterable`
 .. |Callable| replace:: :class:`~collections.Callable`
@@ -60,7 +56,7 @@ class Event(object):
         .. attribute:: state_machine
 
             A |StateMachine| instance that is handling the event (the one whose
-            :func:`pysm.StateMachine.dispatch` method is called)
+            :func:`.StateMachine.dispatch` method is called)
 
         .. attribute:: propagate
 
@@ -116,8 +112,8 @@ class State(object):
     similarly to the State Pattern.
 
     Once it's extended, the preferred way of adding an event handlers is
-    through the :func:`~pysm.State.register_handlers` hook. Usually, there's no
-    need to create the :func:`__init__` in a subclass.
+    through the :func:`~.State.register_handlers` hook. Usually,
+    there's no need to create the :func:`__init__` in a subclass.
 
     :param name: Human readable state name
     :type name: str
@@ -172,8 +168,8 @@ class State(object):
     def register_handlers(self):
         '''Hook method to register event handlers.
 
-        It is used to easily extend |State| class. The hook is
-        called from within the base :func:`pysm.State__init__`. Usually, the
+        It is used to easily extend |State| class. The hook is called from
+        within the base :func:`.State__init__`. Usually, the
         :func:`__init__` doesn't have to be created in a subclass.
 
         Event handlers are kept in a `dict`, with events' names as keys,
@@ -321,22 +317,22 @@ class StateMachine(State):
 
             Stack of previous local states in a state machine. With every
             transition, a previous state (instance of |State|) is pushed to the
-            `state_stack`. Only :attr:`pysm.StateMachine.STACK_SIZE` (32 by
-            default) are stored and old values are removed from the stack.
+            `state_stack`. Only :attr:`.StateMachine.STACK_SIZE` (32
+            by default) are stored and old values are removed from the stack.
 
         .. attribute:: leaf_state_stack
 
             Stack of previous leaf states in a state machine. With every
             transition, a previous leaf state (instance of |State|) is pushed
             to the `leaf_state_stack`. Only
-            :attr:`pysm.StateMachine.STACK_SIZE` (32 by default) are stored and
-            old values are removed from the stack.
+            :attr:`.StateMachine.STACK_SIZE` (32 by default) are
+            stored and old values are removed from the stack.
 
         **leaf_state**
-            See the :attr:`~pysm.StateMachine.leaf_state` property.
+            See the :attr:`~.StateMachine.leaf_state` property.
 
         **root_machine**
-            See the :attr:`~pysm.StateMachine.root_machine` property.
+            See the :attr:`~.StateMachine.root_machine` property.
 
     :param name: Human readable state machine name
     :type name: str
@@ -349,6 +345,10 @@ class StateMachine(State):
         small as possible memory-wise and thus it's more memory efficient. It
         is valid to replace a |State| with a |StateMachine| later on if there's
         a need to extend a state with internal states.
+
+    .. note::
+
+        For the sake of speed thread safety isn't guaranteed.
 
     **Example Usage:**
 
@@ -397,7 +397,7 @@ class StateMachine(State):
         '''Add `states` to the |StateMachine|.
 
         To set the initial state use
-        :func:`~pysm.StateMachine.set_initial_state`.
+        :func:`~.StateMachine.set_initial_state`.
 
         :param states: A list of states to be added
         :type states: |State|
@@ -549,11 +549,11 @@ class StateMachine(State):
     def leaf_state(self):
         '''Get the current leaf state.
 
-        The :attr:`~pysm.StateMachine.state` property gives the current, local
-        state in a state machine. The `leaf_state` goes to the bottom in a
-        hierarchy of states. In most cases, this is the property that should be
-        used to get the current state in a state machine, even in a flat FSM,
-        to keep the consistency in the code and to avoid confusion.
+        The :attr:`~.StateMachine.state` property gives the current,
+        local state in a state machine. The `leaf_state` goes to the bottom in
+        a hierarchy of states. In most cases, this is the property that should
+        be used to get the current state in a state machine, even in a flat
+        FSM, to keep the consistency in the code and to avoid confusion.
 
         :returns: Leaf state in a hierarchical state machine
         :rtype: |State|
@@ -570,11 +570,11 @@ class StateMachine(State):
         '''Initialize states in the state machine.
 
         After a state machine has been created and all states are added to it,
-        :func:`~pysm.StateMachine.initialize` has to be called.
+        :func:`~.StateMachine.initialize` has to be called.
 
         If using nested state machines (HSM),
-        :func:`~pysm.StateMachine.initialize` has to be called on a root state
-        machine in the hierarchy.
+        :func:`~.StateMachine.initialize` has to be called on a root
+        state machine in the hierarchy.
 
         '''
         machines = deque()
@@ -594,7 +594,7 @@ class StateMachine(State):
         state machine in the hierarchy.
 
         :param event: Event to be dispatched
-        :type event: :class:`pysm.Event`
+        :type event: :class:`.Event`
 
         '''
         event.state_machine = self
@@ -653,7 +653,7 @@ class StateMachine(State):
 
         :param event: (Optional) event that is passed to states involved in the
             transition
-        :type event: :class:`pysm.Event`
+        :type event: :class:`.Event`
 
         '''
         if event is not None:
@@ -667,9 +667,9 @@ class StateMachine(State):
         self._enter_states(event, top_state, to_state)
 
     def revert_to_previous_leaf_state(self, event=None):
-        '''Similar to :func:`pysm.StateMachine.set_previous_leaf_state` but the
-        current leaf_state is not saved on the stack of states. It allows to
-        perform transitions further in the history of states.
+        '''Similar to :func:`.StateMachine.set_previous_leaf_state`
+        but the current leaf_state is not saved on the stack of states. It
+        allows to perform transitions further in the history of states.
 
         '''
         self.set_previous_leaf_state(event)
