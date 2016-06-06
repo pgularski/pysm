@@ -1,29 +1,60 @@
-'''The State Pattern, ah it solves so many problems and untangles the code.
-Yet it's a bit rigit. The goal of this library is to give you the close to the
-State Pattern feeling with much more flexibility.
+'''Ah, `The State Pattern <https://en.wikipedia.org/wiki/State_pattern>`_,
+it solves so many problems, untangles the code and saves one's sanity.
+Yet.., it's a bit rigid and doesn't scale. The goal of this library is to give
+you the close to the State Pattern simplicity with much more flexibility. And,
+if needed, the full state machine functionality, including `FSM
+<https://en.wikipedia.org/wiki/Finite-state_machine>`_, `HSM
+<https://en.wikipedia.org/wiki/UML_state_machine
+#Hierarchically_nested_states>`_, `PDA
+<https://en.wikipedia.org/wiki/Pushdown_automaton>`_ and other tasty things.
 
-Explicit is better than implicit.
-Gives similar to the State Pattern feeling but way more flexible.
+
+Goals:
+    - Provide a State Pattern-like behavior with more flexibility
+    - Be explicit and don't add any code to objects
+    - Handle directly any kind of event (not only strings)
 
 Give a comparison between the State Pattern and this state machine.
 
 Every state is is saved on the stack of states
 A stack may be used in a PDA
 
+For the sake of speed thread safety isn't guaranteed.
+
 May be used as a flat FSM.
 
 Some terminology:
+    PDA and stack
+    leaf state stack
     leaf state
     previous leaf state
 
 Some design decisions:
-    :class:`pysm.StateMachine` is a subclass of :class:`pysm.State`
+    |StateMachine| is a subclass of |State|
+
+Examples to add:
+    - Flat FSM for those who don't need HSMs
+    - How to pass the entity object
+    - Getting source event from enter/exit
+    - using if/elif/else conditions
+    - Using input
+
+Advanced topics:
+    - How data is stored
+    - How add_transition splits the input internally
+    - Thread safety
+    - Complexity
+
+----
+
+.. |StateMachine| replace:: :class:`~pysm.StateMachine`
+.. |State| replace:: :class:`~pysm.State`
+.. |Hashable| replace:: :class:`~collections.Hashable`
+.. |Iterable| replace:: :class:`~collections.Iterable`
+.. |Callable| replace:: :class:`~collections.Callable`
+
 
 '''
-# TODO: Separate in docstring - simple FSM case and HSM case?
-# TODO: on changed to _on
-# TODO: propagate shouldn't be an argument really but just a property
-
 import collections
 from collections import deque
 import logging
@@ -37,40 +68,39 @@ logger.setLevel(logging.INFO)
 
 
 class StateMachineException(Exception):
-    '''All :class:`pysm.StateMachine` exceptions are of this type. '''
+    '''All |StateMachine| exceptions are of this type. '''
     pass
 
 
 class Event(object):
-    r''':class:`pysm.StateMachine` reacts to events. These have to be instances
-    of this class.  Events are also used to control the flow of data propagated
-    to states within the states hierarchy.
+    r'''Triggers actions and transition in |StateMachine|.
+
+    Events are also used to control the flow of data propagated to states
+    within the states hierarchy.
+
+    Event objects have the following attributes set after an event has been
+    dispatched:
+
+    **Attributes:**
+
+        .. attribute:: state_machine
+
+            |StateMachine| instance in the states hierarchy.
+
+        .. attribute:: propagate
+
+            An event is propagated from a current leaf state up in the states
+            hierarchy until it encounters a handler that can handle the event.
+            To propagate it further, it has to be set to `True` in a handler.
 
     :param name: Name of an event. It may be anything as long as it's hashable.
-    :type name: :class:`collections.Hashable`
+    :type name: |Hashable|
     :param input: Optional input. Anything hashable.
-    :type input: :class:`collections.Hashable`
+    :type input: |Hashable|
     :param \*\*cargo: Keyword arguments for an event, used to transport data to
         handlers.  It's added to an event as a `cargo` property of type `dict`.
         For `enter` and `exit` events, the original event that triggered a
         transition is passed in cargo as `source_event` entry.
-
-    Event objects have the following attributes set once they've got
-    instantiated:
-
-        - `state_machine`: It's always set to the root
-          :class:`pysm.StateMachine` instance in the states hierarchy. It
-          allows getting useful information from within event handlers, like a
-          current leaf state or a previous leaf state, the state machine's
-          stack and the like.
-
-        - `propagate`: It's `True` by default which means that an event will
-          get propagated from a current leaf state up in the states hierarchy
-          until it encounters a handler that can handle the event. Then it is
-          set to `False`. It has to be explicitly set to `True` in a handler to
-          re-propagate the event up in the hierarchy. It's similar to the class
-          hierarchy in object oriented programming - `super` has to be invoked
-          to call a method from a base class.
 
     .. note`:
 
@@ -85,6 +115,7 @@ class Event(object):
         state_machine.dispatch(Event('start', key='value'))
         state_machine.dispatch(Event('parse', input='#', entity=my_object))
         state_machine.dispatch(Event('%'))
+        state_machine.dispatch(Event(frozenset([1, 2])))
 
     '''
     def __init__(self, name, input=None, **cargo):
@@ -101,15 +132,20 @@ class Event(object):
 
 
 class State(object):
-    '''Represents a state within a state machine. All states are kept as
-    instances of this class. It is encouraged to extend this class to
-    encapsulate a state behavior, similarly to the State Pattern.
+    '''Represents a state in a state machine.
+
+    `enter` and `exit` actions are called whenever a state is entered or
+    exited respectively. These action names are reserved only for this purpose.
+
+    It is encouraged to extend this class to encapsulate a state behavior,
+    similarly to the State Pattern.
+
+    Once it's extended, the preferred way of adding event handlers is through
+    the :func:`~pysm.State.register_handlers` hook. Usually, there's no need
+    to create the :func:`__init__` in a subclass.
 
     :param name: Human readable state name
     :type name: str
-
-    :func:`pysm.State.register_handlers` hook to faciliate exteneding the
-    :class:`pysm.State`.
 
     **Example Usage:**
 
@@ -146,14 +182,6 @@ class State(object):
             'another_event': another_handler
         }
 
-
-    .. note::
-
-        @staticmethod could be use when overwriting
-        Calling a state's handler from other state is possible (hence the
-        `state` argument) although it would be considered a bad coding
-        practice.
-
     '''
     def __init__(self, name):
         self.parent = None
@@ -167,18 +195,21 @@ class State(object):
         return '<State {0} ({1})>'.format(self.name, hex(id(self)))
 
     def register_handlers(self):
-        '''Hook method to register event handlers. It is used to easily extend
-        :class:`pysm.State` class - :func:`__init__` doesn't have to be created
-        in a subclass, as the base one creates all that is required and then
-        calls this hook method. As handlers are kept in a `dict`, registered
-        events may be of any hashable type.
+        '''Hook method to register event handlers.
+
+        It is used to easily extend |State| class. The hook is
+        called from within the base :func:`pysm.State__init__`. Usually, the
+        :func:`__init__` doesn't have to be created in a subclass.
+
+        Event handlers are kept in a `dict`, with events' names as keys,
+        therefore registered events may be of any hashable type.
 
         Handlers take two arguments:
 
-        - state: The current state that is handling an event. The same
+        - **state**: The current state that is handling an event. The same
               handler function may be attached to many states, therefore it
               is helpful to get the handling state's instance.
-        - event: An event that triggered the handler call. If it is an
+        - **event**: An event that triggered the handler call. If it is an
               `enter` or `exit` event, then the source event (the one that
               triggered the transition) is passed in `event`'s cargo
               property as `cargo.source_event`.
@@ -202,11 +233,12 @@ class State(object):
         pass
 
     def is_substate(self, state):
-        '''Check whether the `state` is a substate of `self`. Also `self` is
-        considered a substate of `self`.
+        '''Check whether the `state` is a substate of `self`.
+
+        Also `self` is considered a substate of `self`.
 
         :param state: State to verify
-        :type state: :class:`pysm.State`
+        :type state: |State|
         :returns: `True` if `state` is a substate of `self`, `False` otherwise
         :rtype: bool
 
@@ -272,32 +304,111 @@ class Stack(object):
 
 
 class StateMachine(State):
-    '''
-    StateMachine may be empty (with no states added to it), then it acts as a
-    simple State.
+    '''State machine controls actions and transitions.
 
-    :param name: Human readable state name
+    To provide the State Pattern-like behavior, the formal state machine rules
+    may be slightly broken, and instead of creating an `internal transition
+    <https://en.wikipedia.org/wiki/UML_state_machine #Internal_transitions>`_
+    for every action that doesn't require a state change, event handlers may be
+    added to states. These are handled first when an event occurs. After that
+    the actual transition is called, calling `enter`/`exit` actions and other
+    transition actions. Nevertheless, internal transitions are also supported.
+
+    So the order of calls on an event is as follows:
+
+        1. State's event handler
+        2. `condition` callback
+        3. `before` callback
+        4. `exit` handlers
+        5. `action` callback
+        6. `enter` handlers
+        7. `after` callback
+
+    If there's no handler in states or transition for an event, it is silently
+    ignored.
+
+    If using nested state machines, all events should be sent to the root state
+    machine.
+
+    **Attributes:**
+
+        .. attribute:: state
+
+            Current, local state (instance of |State|) in a state machine.
+
+        .. attribute:: stack
+
+            Stack that can be used if the `Pushdown Automaton (PDA)
+            <https://en.wikipedia.org/wiki/Pushdown_automaton>`_ functionality
+            is needed.
+
+        .. attribute:: state_stack
+
+            Stack of previous local states in a state machine. With every
+            transition, a previous state (instance of |State|) is pushed to the
+            `state_stack`. Only :attr:`pysm.StateMachine.STACK_SIZE` (32 by
+            default) are stored and old values are removed from the stack.
+
+        .. attribute:: leaf_state_stack
+
+            Stack of previous leaf states in a state machine. With every
+            transition, a previous leaf state (instance of |State|) is pushed
+            to the `leaf_state_stack`. Only
+            :attr:`pysm.StateMachine.STACK_SIZE` (32 by default) are stored and
+            old values are removed from the stack.
+
+        **leaf_state**
+            See the :attr:`~pysm.StateMachine.leaf_state` property.
+
+        **root_machine**
+            See the :attr:`~pysm.StateMachine.root_machine` property.
+
+    :param name: Human readable state machine name
     :type name: str
 
-    :class:`pysm.StateMachine` extends :class:`pysm.State`
+    .. note ::
+
+        |StateMachine| extends |State| and therefore it is possible to always
+        use a |StateMachine| instance instead of the |State|. This wouldn't
+        be a good practice though, as the |State| class is designed to be as
+        small as possible memory-wise and thus it's more memory efficient. It
+        is valid to replace a |State| with a |StateMachine| later on if there's
+        a need to extend a state with internal states.
+
+    **Example Usage:**
+
+    .. code-block:: python
+
+        state_machine = StateMachine('root_machine')
+        state_on = State('On')
+        state_off = State('Off')
+        state_machine.add_state('Off', initial=True)
+        state_machine.add_state('On')
+        state_machine.add_transition(state_on, state_off, events=['off'])
+        state_machine.add_transition(state_off, state_on, events=['on'])
+        state_machine.initialize()
+        state_machine.dispatch(Event('on'))
 
     '''
+    STACK_SIZE = 32
+
     def __init__(self, name):
         super(StateMachine, self).__init__(name)
         self.states = set()
         self.state = None
         self._transitions = TransitionsContainer(self)
-        self.state_stack = Stack(maxlen=32)
-        self.leaf_state_stack = Stack(maxlen=32)
+        self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
+        self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.stack = Stack()
 
     def add_state(self, state, initial=False):
-        '''Add a state to a state machine. If states are added, one (and only
-        one) of them has to be declared as `initial`.
+        '''Add a state to a state machine.
 
-        :param state: State to be added. It may be an another
-            :class:`pysm.StateMachine`
-        :type state: :class:`pysm.State`
+        If states are added, one (and only one) of them has to be declared as
+        `initial`.
+
+        :param state: State to be added. It may be an another |StateMachine|
+        :type state: |State|
         :param initial: Declare a state as initial
         :type initial: bool
 
@@ -308,18 +419,25 @@ class StateMachine(State):
         self.states.add(state)
 
     def add_states(self, *states):
-        '''Add all `states` to the :class:`pysm.StateMachine`. In order to set
-        the initial state use :func:`pysm.StateMachine.set_initial_state`.
+        '''Add `states` to the |StateMachine|.
+
+        To set the initial state use
+        :func:`~pysm.StateMachine.set_initial_state`.
 
         :param states: A list of states to be added
-        :type states: :class:`pysm.State`
+        :type states: |State|
 
         '''
         for state in states:
             self.add_state(state)
 
     def set_initial_state(self, state):
-        '''Set an initial state in a state machine. '''
+        '''Set an initial state in a state machine.
+
+        :param state: Set this state as initial in a state machine
+        :type state: |State|
+
+        '''
         Validator(self).validate_set_initial(state)
         state.initial = True
 
@@ -328,7 +446,7 @@ class StateMachine(State):
         '''Get the initial state in a state machine.
 
         :returns: Initial state in a state machine
-        :rtype: :class:`pysm.State`
+        :rtype: |State|
 
         '''
         for state in self.states:
@@ -341,7 +459,7 @@ class StateMachine(State):
         '''Get the root state machine in a states hierarchy.
 
         :returns: Root state in the states hierarchy
-        :rtype: :class:`pysm.StateMachine`
+        :rtype: |StateMachine|
 
         '''
         machine = self
@@ -352,44 +470,68 @@ class StateMachine(State):
     def add_transition(
             self, from_state, to_state, events, input=None, action=None,
             condition=None, before=None, after=None):
-        '''Add transition to a state machine.
+        '''Add a transition to a state machine.
 
-        # TODO: Conditional if/elif/else transitions
-        # TODO: callback arguments
+        All callbacks take two arguments - `state` and `event`. See parameters
+        description for details.
+
+        It is possible to create conditional if/elif/else-like logic for
+        transitions. To do so, add many same transition rules with different
+        condition callbacks. First met condition will trigger a transition, if
+        no condition is met, no transition is performed.
 
         :param from_state: Source state
-        :type from_state: :class:`pysm.State`
+        :type from_state: |State|
         :param to_state: Target state. If `None`, then it's an `internal
             transition <https://en.wikipedia.org/wiki/UML_state_machine
             #Internal_transitions>`_
-        :type to_state: :class:`pysm.State`, `None`
+        :type to_state: |State|, `None`
         :param events: List of events that trigger the transition
-        :type events: :class:`collections.Iterable`
-            of :class:`collections.Hashable`
-        :param input: List of inputs that trigger the transition, may be `None`
-        :type input: `None`, :class:`collections.Iterable`
-            of :class:`collections.Hashable`
+        :type events: |Iterable| of |Hashable|
+        :param input: List of inputs that trigger the transition. A transition
+            event may be associated with a specific input. i.e.: An event may
+            be ``parse`` and an input associated with it may be ``$``. May be
+            `None` (default), then every matched event name triggers a
+            transition.
+        :type input: `None`, |Iterable| of |Hashable|
         :param action: Action callback that is called during the transition
             after all states have been left but before the new one is entered.
-        :type action: :class:`collections.Callable`
+
+            `action` callback takes two arguments:
+
+                - state: Leaf state before transition
+                - event: Event that triggered the transition
+
+        :type action: |Callable|
         :param condition: Condition callback - if returns `True` transition may
             be initiated.
-        :type condition: :class:`collections.Callable`
+
+            `condition` callback takes two arguments:
+
+                - state: Leaf state before transition
+                - event: Event that triggered the transition
+
+        :type condition: |Callable|
         :param before: Action callback that is called right before the
             transition.
-        :type before: :class:`collections.Callable`
-        :param after: Action callback that is called just after the transition
-        :type after: :class:`collections.Callable`
 
-        Internal transitions (the ones that actually do not cause a state
-        change or do not trigger enter/exit action) may be added by specyfying
-        `to_state` as `None`. The other way, more natural, but not as formal,
-        would be to just add a handler to a state, so there's no need to
-        specify a transition for every action. That, again, brings us closer to
-        the State Pattern.
+            `before` callback takes two arguments:
+
+                - state: Leaf state before transition
+                - event: Event that triggered the transition
+
+        :type before: |Callable|
+        :param after: Action callback that is called just after the transition
+
+            `after` callback takes two arguments:
+
+                - state: Leaf state after transition
+                - event: Event that triggered the transition
+
+        :type after: |Callable|
 
         '''
-        # Rather than adding some if statements later on let's just declare a
+        # Rather than adding some if statements later on, let's just declare a
         # neutral items that will do nothing if called. It simplifies the logic
         # a lot.
         if input is None:
@@ -430,16 +572,16 @@ class StateMachine(State):
 
     @property
     def leaf_state(self):
-        '''Get the leaf state in a hierarchical state machine. In order to be
-        explicit leaf_state property is there. A `state` property gives the
-        current state in a state machine the state is in, the leaf_state goes
-        to the bottom in a hierarchy of states. In most cases, this is the
-        property that should be used to get the current state in a state
-        machine, even in a flat FSM, to keep the consistency in the code and to
-        avoid confusion.
+        '''Get the current leaf state.
+
+        The :attr:`~pysm.StateMachine.state` property gives the current, local
+        state in a state machine. The `leaf_state` goes to the bottom in a
+        hierarchy of states. In most cases, this is the property that should be
+        used to get the current state in a state machine, even in a flat FSM,
+        to keep the consistency in the code and to avoid confusion.
 
         :returns: Leaf state in a hierarchical state machine
-        :rtype: :class:`pysm.State`
+        :rtype: |State|
 
         '''
         return self._get_leaf_state(self)
@@ -450,9 +592,13 @@ class StateMachine(State):
         return state
 
     def initialize(self):
-        '''Initialize states in the state machine. After a state machine has
-        been created and all states are added to it,
-        :func:`pysm.StateMachine.initialize` has to be called on the root state
+        '''Initialize states in the state machine.
+
+        After a state machine has been created and all states are added to it,
+        :func:`~pysm.StateMachine.initialize` has to be called.
+
+        If using nested state machines (HSM),
+        :func:`~pysm.StateMachine.initialize` has to be called on a root state
         machine in the hierarchy.
 
         '''
@@ -469,8 +615,8 @@ class StateMachine(State):
     def dispatch(self, event):
         '''Dispatch an event to a state machine.
 
-        If using nested state machines (HSM):
-        It has to be called on a root state machine in a hierarchy.
+        If using nested state machines (HSM), it has to be called on a root
+        state machine in the hierarchy.
 
         :param event: Event to be dispatched
         :type event: :class:`pysm.Event`
