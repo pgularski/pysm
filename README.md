@@ -31,6 +31,10 @@ or clone this repository and then
 python setup.py install
 ```
 
+# Documentation
+
+Read the docs - http://pysm.readthedocs.io/
+
 # Rationale
 There are a plethora of python state machine implementations out there. Some of them really powerful.
 There's usually one problem with them, though - quite often they have too much magic under the hood. Specifically, they tend to add methods to a subject object, for instance. Using dynamic method creation seems apealing at first glance and it looks very well in simple demo examples. Yet the more mature the project gets the higher the risk someone is going to get bitten with this very feature. I have learned it the hard way. In most cases you don't want a dynamic property or method creation in your objects. And the further you get and more customers you have and APIs stabilise the more painful it gets when you realise you didn't want a certain item added to your instance in the first place. And then your dynamic code clashes with the API but it's too late to remove the dynamic code someone's relying on.
