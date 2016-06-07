@@ -1,9 +1,6 @@
 pysm
 ====
 
-Python State Machine
---------------------
-
 .. image:: https://travis-ci.org/pgularski/pysm.svg?branch=master
     :target: https://travis-ci.org/pgularski/pysm
 
@@ -18,6 +15,9 @@ Python State Machine
     :target: http://pysm.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
+
+Python State Machine
+--------------------
 
 `The State Pattern <https://en.wikipedia.org/wiki/State_pattern>`_
 solves many problems, untangles the code and saves one's sanity.
