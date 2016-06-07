@@ -56,7 +56,7 @@ class Event(object):
         .. attribute:: state_machine
 
             A |StateMachine| instance that is handling the event (the one whose
-            :func:`.StateMachine.dispatch` method is called)
+            :func:`pysm.pysm.StateMachine.dispatch` method is called)
 
         .. attribute:: propagate
 
@@ -112,7 +112,7 @@ class State(object):
     similarly to the State Pattern.
 
     Once it's extended, the preferred way of adding an event handlers is
-    through the :func:`~.State.register_handlers` hook. Usually,
+    through the :func:`register_handlers` hook. Usually,
     there's no need to create the :func:`__init__` in a subclass.
 
     :param name: Human readable state name
@@ -397,7 +397,7 @@ class StateMachine(State):
         '''Add `states` to the |StateMachine|.
 
         To set the initial state use
-        :func:`~.StateMachine.set_initial_state`.
+        :func:`set_initial_state`.
 
         :param states: A list of states to be added
         :type states: |State|
@@ -570,10 +570,10 @@ class StateMachine(State):
         '''Initialize states in the state machine.
 
         After a state machine has been created and all states are added to it,
-        :func:`~.StateMachine.initialize` has to be called.
+        :func:`initialize` has to be called.
 
         If using nested state machines (HSM),
-        :func:`~.StateMachine.initialize` has to be called on a root
+        :func:`initialize` has to be called on a root
         state machine in the hierarchy.
 
         '''
@@ -667,7 +667,7 @@ class StateMachine(State):
         self._enter_states(event, top_state, to_state)
 
     def revert_to_previous_leaf_state(self, event=None):
-        '''Similar to :func:`.StateMachine.set_previous_leaf_state`
+        '''Similar to :func:`set_previous_leaf_state`
         but the current leaf_state is not saved on the stack of states. It
         allows to perform transitions further in the history of states.
 
