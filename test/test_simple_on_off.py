@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 from pysm import State, StateMachine, Event
 
 on = State('on')

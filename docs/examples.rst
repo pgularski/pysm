@@ -6,6 +6,7 @@ Examples
 .. contents::
     :local:
 
+
 Simple state machine
 --------------------
 
@@ -13,6 +14,20 @@ This is a simple state machine with only two states - `on` and `off`.
 
 .. include:: ../examples/simple_on_off.py
     :literal:
+
+
+Complex hierarchical state machine
+----------------------------------
+
+A Hierarchical state machine similar to the one from Miro Samek's book [#f1]_,
+page 95. *It is a state machine that contains all possible state transition
+topologies up to four levels of state nesting* [#f2]_
+
+.. image:: _static/img/complex_hsm.png
+
+.. include:: ../examples/complex_hsm.py
+    :literal:
+
 
 Different ways to attach event handlers
 ---------------------------------------
@@ -24,6 +39,21 @@ handlers to it. This resembles the State Pattern way of writing a state
 machine. But handlers may live anywhere, really, and you can attach them
 however you want. You're free to chose your own style of writing state machines
 with pysm.
+Also in this example a transition to a historical state is used.
+
+.. image:: _static/img/oven_hsm.png
+
+The oven code:
 
 .. include:: ../examples/oven.py
     :literal:
+
+
+----
+
+.. rubric:: Footnotes
+
+.. [#f1] `Miro Samek, Practical Statecharts in C/C++, CMP Books 2002.
+        <http://www.amazon.com/Practical-Statecharts-Quantum-Programming-
+        Embedded/dp/1578201101/ref=asap_bc?ie=UTF8>`_
+.. [#f2] http://www.embedded.com/print/4008251 (visited on 07.06.2016)
