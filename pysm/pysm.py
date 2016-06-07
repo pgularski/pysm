@@ -169,7 +169,7 @@ class State(object):
         '''Hook method to register event handlers.
 
         It is used to easily extend |State| class. The hook is called from
-        within the base :func:`.State__init__`. Usually, the
+        within the base :func:`.State.__init__`. Usually, the
         :func:`__init__` doesn't have to be created in a subclass.
 
         Event handlers are kept in a `dict`, with events' names as keys,
