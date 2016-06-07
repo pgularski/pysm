@@ -43,9 +43,23 @@ Also in this example a transition to a historical state is used.
 
 .. image:: _static/img/oven_hsm.png
 
-The oven code:
-
 .. include:: ../examples/oven.py
+    :literal:
+
+
+Reverse Polish notation calculator
+----------------------------------
+
+A state machine is used in the `Reverse Polish notation (RPN)
+<https://en.wikipedia.org/wiki/Reverse_Polish_notation>`_ calculator as a
+parser. A single event name (`parse`) is used along with specific `inputs` (See
+:func:`pysm.pysm.StateMachine.add_transition`).
+
+This example also demonstrates how to use the stack of a state machine, so it
+behaves as a `Pushdown Automaton (PDA)
+<https://en.wikipedia.org/wiki/Pushdown_automaton>`_
+
+.. include:: ../examples/rpn_calculator.py
     :literal:
 
 

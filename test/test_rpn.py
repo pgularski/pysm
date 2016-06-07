@@ -1,10 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-'''
-Test StateMachine can act as Pushdown Automaton.
-'''
-
-import string
+import string as py_string
 from pysm import StateMachine, Event, State
 
 
@@ -20,13 +14,13 @@ class Calculator(object):
         sm.add_state(initial, initial=True)
         sm.add_state(number)
         sm.add_transition(initial, number,
-                          events=['parse'], input=string.digits,
+                          events=['parse'], input=py_string.digits,
                           action=self.start_building_number)
         sm.add_transition(number, None,
-                          events=['parse'], input=string.digits,
+                          events=['parse'], input=py_string.digits,
                           action=self.build_number)
         sm.add_transition(number, initial,
-                          events=['parse'], input=string.whitespace)
+                          events=['parse'], input=py_string.whitespace)
         sm.add_transition(initial, None,
                           events=['parse'], input='+-*/',
                           action=self.do_operation)
