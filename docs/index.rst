@@ -30,5 +30,6 @@ Goals:
    pysm_module
    installing
    quickstart
+   examples
    user_guide
    cookbook
