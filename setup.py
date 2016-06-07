@@ -12,7 +12,7 @@ setup(
     author_email='piotr.gularski@gmail.com',
     license='MIT',
     packages=find_packages(),
-    zip_safe=True,
+    zip_safe=False,
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
