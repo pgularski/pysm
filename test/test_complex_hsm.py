@@ -2,10 +2,10 @@ from pysm import State, StateMachine, Event
 
 foo = True
 
-def onEventnter(state, event):
+def on_enter(state, event):
     print('enter state {0}'.format(state.name))
 
-def onEventxit(state, event):
+def on_exit(state, event):
     print('exit state {0}'.format(state.name))
 
 def set_foo(state, event):
@@ -85,7 +85,7 @@ s2.add_transition(s21, s21, events='h', condition=is_not_foo, action=set_foo)
 # Attach enter/exit handlers
 states = [m, s0, s1, s11, s2, s21, s211]
 for state in states:
-    state.handlers = {'enter': onEventnter, 'exit': onEventxit}
+    state.handlers = {'enter': on_enter, 'exit': on_exit}
 
 m.initialize()
 
