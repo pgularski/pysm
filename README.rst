@@ -19,10 +19,6 @@ Python State Machine
     :alt: Documentation Status
 
 
-`Github <https://github.com/pgularski/pysm/>`_ |
-`PyPI <https://pypi.python.org/pypi/pysm/>`_
-
-
 `The State Pattern <https://en.wikipedia.org/wiki/State_pattern>`_
 solves many problems, untangles the code and saves one's sanity.
 Yet.., it's a bit rigid and doesn't scale. The goal of this library is to give

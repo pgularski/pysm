@@ -1,7 +1,19 @@
+import codecs
+import os
 from setuptools import setup, find_packages, Command
+
+HERE = os.path.abspath(os.path.dirname(__file__))
 
 # Get __version__
 exec(open('pysm/version.py').read())
+
+
+def read(*parts):
+    # Build an absolute path from *parts* and and return the contents of the
+    # resulting file.  Assume UTF-8 encoding.
+    with codecs.open(os.path.join(HERE, *parts), "rb", "utf-8") as f:
+        return f.read()
+
 
 setup(
     name='pysm',
@@ -11,6 +23,7 @@ setup(
     author='Piotr Gularski',
     author_email='piotr.gularski@gmail.com',
     license='MIT',
+    long_description=read('README.rst'),
     packages=find_packages(),
     zip_safe=False,
     classifiers=[
