@@ -33,30 +33,30 @@ if needed, the full state machine functionality, including `FSM
 Goals
 -----
 
-    - Provide a State Pattern-like behavior with more flexibility
-    - Be explicit and don't add any code to objects
-    - Handle directly any kind of event (not only strings) - parsing strings is
-      cool again!
-    - Keep it simple, even for someone who's not very familiar with the FSM
-      terminology
+* Provide a State Pattern-like behavior with more flexibility
+* Be explicit and don't add any code to objects
+* Handle directly any kind of event (not only strings) - parsing strings is
+  cool again!
+* Keep it simple, even for someone who's not very familiar with the FSM
+  terminology
 
 
 Features
 --------
 
-    - Finite State Machine (FSM)
-    - Hierarchical State Machine (HSM) with Internal/External/Local transitions
-    - Pushdown Automaton (PDA)
-    - Transition callbacks - action, before, after
-    - State hooks - enter, exit, and other event handlers
-    - Entry and exit actions are associated with states, not transitions
-    - Events may be anything as long as they're hashable
-    - States history and transition to previous states
-    - Conditional transitions (if/elif/else-like logic)
-    - Explicit behaviour (no method or attribute is added to the object containing a state machine)
-    - No need to extend a class with State Machine class (composition over inheritance)
-    - Fast (even with hundreds of transition rules)
-    - Not too many pythonisms, so that it's easily portable to other languages (ie. `JavaScript <https://github.com/pgularski/smjs>`_).
+* Finite State Machine (FSM)
+* Hierarchical State Machine (HSM) with Internal/External/Local transitions
+* Pushdown Automaton (PDA)
+* Transition callbacks - action, before, after
+* State hooks - enter, exit, and other event handlers
+* Entry and exit actions are associated with states, not transitions
+* Events may be anything as long as they're hashable
+* States history and transition to previous states
+* Conditional transitions (if/elif/else-like logic)
+* Explicit behaviour (no method or attribute is added to the object containing a state machine)
+* No need to extend a class with State Machine class (composition over inheritance)
+* Fast (even with hundreds of transition rules)
+* Not too many pythonisms, so that it's easily portable to other languages (ie. `JavaScript <https://github.com/pgularski/smjs>`_).
 
 
 Installation
@@ -81,8 +81,8 @@ Read the docs - http://pysm.readthedocs.io/
 
 Links
 -----
-    - `Documentation <http://pysm.readthedocs.io>`_
-    - `Installation <http://pysm.readthedocs.io/en/latest/installing.html>`_
-    - `Github <https://github.com/pgularski/pysm>`_
-    - `Issues <https://github.com/pgularski/pysm/issues>`_
-    - `Examples <http://pysm.readthedocs.io/en/latest/examples.html>`_
+* `Documentation <http://pysm.readthedocs.io>`_
+* `Installation <http://pysm.readthedocs.io/en/latest/installing.html>`_
+* `Github <https://github.com/pgularski/pysm>`_
+* `Issues <https://github.com/pgularski/pysm/issues>`_
+* `Examples <http://pysm.readthedocs.io/en/latest/examples.html>`_
