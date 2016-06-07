@@ -5,8 +5,8 @@ Python State Machine
 `PyPI <https://pypi.python.org/pypi/pysm/>`_
 
 
-Ah, `The State Pattern <https://en.wikipedia.org/wiki/State_pattern>`_,
-it solves so many problems, untangles the code and saves one's sanity.
+`The State Pattern <https://en.wikipedia.org/wiki/State_pattern>`_
+solves many problems, untangles the code and saves one's sanity.
 Yet.., it's a bit rigid and doesn't scale. The goal of this library is to give
 you a close to the State Pattern simplicity with much more flexibility. And,
 if needed, the full state machine functionality, including `FSM
