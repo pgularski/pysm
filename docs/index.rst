@@ -28,7 +28,7 @@ Goals:
    :maxdepth: 2
 
    pysm_module
-   quickstart
    installing
+   quickstart
    user_guide
    cookbook

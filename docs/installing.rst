@@ -1,7 +1,6 @@
 Installation
 ============
 
-
 Install pysm from `PyPI <https://pypi.python.org/pypi/pysm/>`_::
 
     pip install pysm
