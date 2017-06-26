@@ -37,6 +37,9 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
+any_event = object()
+
+
 class StateMachineException(Exception):
     '''All |StateMachine| exceptions are of this type. '''
     pass
@@ -255,7 +258,10 @@ class TransitionsContainer(object):
         for transition in self._transitions[key]:
             if transition['condition'](from_state, event) is True:
                 return transition
-
+        key = (self._machine.state, any_event, event.input)
+        for transition in self._transitions[key]:
+            if transition['condition'](from_state, event) is True:
+                return transition
 
 class Stack(object):
     def __init__(self, maxlen=None):

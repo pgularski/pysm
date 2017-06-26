@@ -3,7 +3,7 @@ import pytest
 import pysm
 import logging
 from pysm import (Event, State, StateMachine, StateMachineException, Stack,
-                  logger)
+                  any_event, logger)
 _e = Event
 
 # logger.setLevel(logging.DEBUG)
@@ -1297,6 +1297,23 @@ def test_state_can_handle_hashable_types():
     m.dispatch(_e('&'))
     assert m.leaf_state == s0
     assert my_mock.call_count == 4
+
+
+def test_transition_on_any_event():
+    m = StateMachine('m')
+    s0 = State('s0')
+    s1 = State('s1')
+    m.add_state(s0, initial=True)
+    m.add_state(s1)
+    m.add_transition(s0, s1, events=[any_event])
+    m.add_transition(s1, s0, events=[any_event])
+    m.initialize()
+
+    assert m.leaf_state == s0
+    m.dispatch(_e('whatever'))
+    assert m.leaf_state == s1
+    m.dispatch(_e('whatever'))
+    assert m.leaf_state == s0
 
 
 def enter_on_initialize():
