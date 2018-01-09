@@ -263,6 +263,7 @@ class TransitionsContainer(object):
             if transition['condition'](from_state, event) is True:
                 return transition
 
+
 class Stack(object):
     def __init__(self, maxlen=None):
         self.deque = deque(maxlen=maxlen)
