@@ -262,6 +262,7 @@ class TransitionsContainer(object):
         for transition in self._transitions[key]:
             if transition['condition'](from_state, event) is True:
                 return transition
+        return None
 
 
 class Stack(object):
@@ -621,7 +622,7 @@ class StateMachine(State):
 
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:
-            return
+            return None
         state = self.leaf_state
         self.leaf_state_stack.push(state)
         while (state.parent and
