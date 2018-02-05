@@ -24,11 +24,11 @@ pysm
 
 It can do simple things like this:
 
-![alt tag](https://cloud.githubusercontent.com/assets/3026621/15031178/bf5efb2a-124e-11e6-9748-0b5a5be60a30.png)
+.. image:: https://cloud.githubusercontent.com/assets/3026621/15031178/bf5efb2a-124e-11e6-9748-0b5a5be60a30.png
 
 Or somewhat more complex like that:
 
-![alt tag](https://cloud.githubusercontent.com/assets/3026621/15031148/ad955f06-124e-11e6-865e-c7e3340f14cb.png)
+.. image:: https://cloud.githubusercontent.com/assets/3026621/15031148/ad955f06-124e-11e6-865e-c7e3340f14cb.png
 
 
 Python State Machine
