@@ -4,9 +4,6 @@ pysm - Python State Machine
 The most versatile and flexible Python State Machine library.
 
 
-pysm
-====
-
 .. image:: https://travis-ci.org/pgularski/pysm.svg?branch=master
     :target: https://travis-ci.org/pgularski/pysm
 
