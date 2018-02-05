@@ -1,3 +1,9 @@
+pysm - Python State Machine
+---------------------------
+
+The most versatile and flexible Python State Machine library.
+
+
 pysm
 ====
 
@@ -14,6 +20,15 @@ pysm
 .. image:: https://readthedocs.org/projects/pysm/badge/?version=latest
     :target: http://pysm.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+
+
+It can do simple things like this:
+
+![alt tag](https://cloud.githubusercontent.com/assets/3026621/15031178/bf5efb2a-124e-11e6-9748-0b5a5be60a30.png)
+
+Or somewhat more complex like that:
+
+![alt tag](https://cloud.githubusercontent.com/assets/3026621/15031148/ad955f06-124e-11e6-865e-c7e3340f14cb.png)
 
 
 Python State Machine
@@ -33,10 +48,12 @@ if needed, the full state machine functionality, including `FSM
 Goals
 -----
 
-* Provide a State Pattern-like behavior with more flexibility
-* Be explicit and don't add any code to objects
-* Handle directly any kind of event (not only strings) - parsing strings is
-  cool again!
+* Provide a State Pattern-like behavior with more flexibility (see
+  `Documentation <http://pysm.readthedocs.io/en/latest/examples.html>`_ for
+  examples)
+* Be explicit and don't add any magic code to objects that use pysm
+* Handle directly any kind of event or input (not only strings) - parsing
+  strings is cool again!
 * Keep it simple, even for someone who's not very familiar with the FSM
   terminology
 
@@ -76,7 +93,8 @@ or clone the `Github pysm repository <https://github.com/pgularski/pysm/>`_::
 Documentation
 -------------
 
-Read the docs - http://pysm.readthedocs.io/
+Read the docs for API documentation and examples - http://pysm.readthedocs.io/
+See Unit Tests to see it working and extensively tested.
 
 
 Links
