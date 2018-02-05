@@ -19,6 +19,9 @@ The most versatile and flexible Python State Machine library.
     :alt: Documentation Status
 
 
+Implement simple and complex state machines
+------------------------------------------
+
 It can do simple things like this:
 
 .. image:: https://cloud.githubusercontent.com/assets/3026621/15031178/bf5efb2a-124e-11e6-9748-0b5a5be60a30.png
