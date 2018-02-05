@@ -1,7 +1,7 @@
 pysm - Python State Machine
 ---------------------------
 
-The most versatile and flexible Python State Machine library.
+Versatile and flexible Python State Machine library.
 
 
 .. image:: https://travis-ci.org/pgularski/pysm.svg?branch=master
