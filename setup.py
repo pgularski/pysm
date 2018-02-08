@@ -19,7 +19,7 @@ setup(
     name='pysm',
     version=__version__,
     url='https://github.com/pgularski/pysm',
-    description='Python State Machine',
+    description='Versatile and flexible Python State Machine library',
     author='Piotr Gularski',
     author_email='piotr.gularski@gmail.com',
     license='MIT',
