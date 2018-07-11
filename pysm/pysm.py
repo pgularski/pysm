@@ -683,6 +683,7 @@ class StateMachine(State):
         self.set_previous_leaf_state(event)
         try:
             self.leaf_state_stack.pop()
+            self.leaf_state_stack.pop()
         except IndexError:
             return
 
