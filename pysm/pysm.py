@@ -25,7 +25,6 @@ Goals:
 .. |Callable| replace:: :class:`~collections.Callable`
 
 '''
-import collections
 import logging
 import sys
 from collections import defaultdict, deque
@@ -33,14 +32,16 @@ from collections import defaultdict, deque
 
 # Required to make it Micropython compatible
 if str(type(defaultdict)).find('module') > 0:
+    # pylint: disable=no-member
     defaultdict = defaultdict.defaultdict
 
 
 # Required to make it Micropython compatible
 if str(type(deque)).find('module') > 0:
     deque_module = deque
-    class deque_maxlen:
+    class deque_maxlen(object):
         def __init__(self, iterable=None, maxlen=0):
+            # pylint: disable=no-member
             self.q = deque_module.deque(iterable)
             self.maxlen = maxlen
 
@@ -56,6 +57,7 @@ if str(type(deque)).find('module') > 0:
             return getattr(self.q, name)
 
         def __bool__(self):
+            # pylint: disable=len-as-condition
             if len(self.q) > 0:
                 return True
             return False
@@ -68,7 +70,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
-class AnyEvent:
+class AnyEvent(object):
     '''
     hash(object()) doesn't work in MicroPython therefore the need for this class
     '''
@@ -587,7 +589,6 @@ class StateMachine(State):
                     'before': before,
                     'after': after,
                 }
-                hash(key)
                 self._transitions.add(key, transition)
 
     def _get_transition(self, event):
