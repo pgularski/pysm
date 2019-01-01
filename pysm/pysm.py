@@ -790,6 +790,7 @@ class Validator(object):
 
     def _validate_to_state(self, to_state):
         root_machine = self.state_machine.root_machine
+        # pylint: disable=no-else-return
         if to_state is None:
             return
         elif to_state is root_machine:
