@@ -8,3 +8,6 @@ disable=E1608,W1627,E1601,E1603,E1602,E1605,E1604,E1607,E1606,W1621,W1620,W1623,
 # List of note tags to take in consideration, separated by a comma.
 # notes=FIXME,XXX,TODO
 notes=
+
+[REPORTS]
+output-format=parseable
