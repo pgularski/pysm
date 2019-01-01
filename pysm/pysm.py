@@ -26,9 +26,40 @@ Goals:
 
 '''
 import collections
-from collections import deque
 import logging
 import sys
+from collections import defaultdict, deque
+
+
+# Required to make it Micropython compatible
+if str(type(defaultdict)).find('module') > 0:
+    defaultdict = defaultdict.defaultdict
+
+
+# Required to make it Micropython compatible
+if str(type(deque)).find('module') > 0:
+    deque_module = deque
+    class deque_maxlen:
+        def __init__(self, iterable=None, maxlen=0):
+            self.q = deque_module.deque(iterable)
+            self.maxlen = maxlen
+
+        def pop(self):
+            return self.q.pop()
+
+        def append(self, item):
+            if self.maxlen > 0 and len(self.q) >= self.maxlen:
+                self.q.popleft()
+            self.q.append(item)
+
+        def __getattr__(self, name):
+            return getattr(self.q, name)
+
+        def __bool__(self):
+            if len(self.q) > 0:
+                return True
+            return False
+    deque = deque_maxlen
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +68,21 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
-any_event = object()
+class AnyEvent:
+    '''
+    hash(object()) doesn't work in MicroPython therefore the need for this class
+    '''
+    pass
+
+any_event = AnyEvent()
+
+
+def is_iterable(obj):
+    try:
+        iter(obj)
+    except TypeError:
+        return False
+    return True
 
 
 class StateMachineException(Exception):
@@ -232,7 +277,7 @@ class State(object):
             self.handlers[event.name](self, event)
         # Never propagate exit/enter events, even if propagate is set to True
         if (self.parent and event.propagate and
-                event.name not in ['exit', 'enter']):
+                event.name not in ('exit', 'enter')):
             self.parent._on(event)
 
     def _nop(self, state, event):
@@ -244,7 +289,7 @@ class State(object):
 class TransitionsContainer(object):
     def __init__(self, machine):
         self._machine = machine
-        self._transitions = collections.defaultdict(list)
+        self._transitions = defaultdict(list)
 
     def add(self, key, transition):
         self._transitions[key].append(transition)
@@ -518,7 +563,7 @@ class StateMachine(State):
         # neutral items that will do nothing if called. It simplifies the logic
         # a lot.
         if input is None:
-            input = [None]
+            input = tuple([None])
         if action is None:
             action = self._nop
         if before is None:
@@ -542,6 +587,7 @@ class StateMachine(State):
                     'before': before,
                     'after': after,
                 }
+                hash(key)
                 self._transitions.add(key, transition)
 
     def _get_transition(self, event):
@@ -751,13 +797,13 @@ class Validator(object):
             self._raise(msg)
 
     def _validate_events(self, events):
-        if not isinstance(events, collections.Iterable):
+        if not is_iterable(events):
             msg = ('Unable to add transition, events is not iterable: {0}'
                    .format(events))
             self._raise(msg)
 
     def _validate_input(self, input):
-        if not isinstance(input, collections.Iterable):
+        if not is_iterable(input):
             msg = ('Unable to add transition, input is not iterable: {0}'
                    .format(input))
             self._raise(msg)
