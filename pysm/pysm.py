@@ -39,6 +39,7 @@ if str(type(defaultdict)).find('module') > 0:
 # Required to make it Micropython compatible
 if str(type(deque)).find('module') > 0:
     deque_module = deque
+
     class deque_maxlen(object):
         def __init__(self, iterable=None, maxlen=0):
             # pylint: disable=no-member
@@ -72,7 +73,8 @@ logger.setLevel(logging.INFO)
 
 class AnyEvent(object):
     '''
-    hash(object()) doesn't work in MicroPython therefore the need for this class
+    hash(object()) doesn't work in MicroPython therefore the need for this
+    class.
     '''
     pass
 
