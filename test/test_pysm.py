@@ -988,7 +988,73 @@ def test_revert_to_previous_state():
     except Exception as exc:
         assert not exc
     assert m.leaf_state == on
-    assert list(m.leaf_state_stack.deque) == [off, on]
+    assert list(m.leaf_state_stack.deque) == [off]
+
+    # Nothing should change now as the "on" state doesn't handle the
+    # "test_no_history"" event.
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == on
+    assert list(m.leaf_state_stack.deque) == [off]
+
+
+def test_revert_to_previous_state_not_reverting_after_first_iteration():
+    m = StateMachine('m')
+    one = State('One')
+    two = State('Two')
+    three = State('Three')
+    four = State('Four')
+    m.add_state(one, initial=True)
+    m.add_state(two)
+    m.add_state(three)
+    m.add_state(four)
+    m.add_transition(one, two, events=['switch_to_two'])
+    m.add_transition(two, three, events=['switch_to_three'])
+    m.add_transition(three, four, events=['switch_to_four'])
+    m.initialize()
+    for state in [one, two, three, four]:
+        state.handlers = {
+            'test_no_history': lambda s, e: m.revert_to_previous_leaf_state()
+        }
+
+    assert m.leaf_state == one
+    assert list(m.leaf_state_stack.deque) == []
+
+    m.dispatch(_e('switch_to_two'))
+    m.dispatch(_e('switch_to_three'))
+    m.dispatch(_e('switch_to_four'))
+    assert m.leaf_state == four
+    assert list(m.leaf_state_stack.deque) == [one, two, three]
+
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == three
+    assert list(m.leaf_state_stack.deque) == [one, two]
+
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == two
+    assert list(m.leaf_state_stack.deque) == [one]
+
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == one
+    assert list(m.leaf_state_stack.deque) == []
+
+    try:
+        m.dispatch(_e('test_no_history'))
+    except Exception as exc:
+        assert not exc
+    assert m.leaf_state == one
+    assert list(m.leaf_state_stack.deque) == []
 
 
 def test_event_propagate():
