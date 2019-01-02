@@ -74,6 +74,7 @@ Features
 * No need to extend a class with State Machine class (composition over inheritance)
 * Fast (even with hundreds of transition rules)
 * Not too many pythonisms, so that it's easily portable to other languages (ie. `JavaScript <https://github.com/pgularski/smjs>`_).
+* Micropython support
 
 
 Installation
@@ -97,6 +98,14 @@ Read the docs for API documentation and examples - http://pysm.readthedocs.io/
 
 See Unit Tests to see it working and extensively tested.
 
+Micropython support
+-------------------
+The library works with pyboards!
+
+```python
+import upip
+upip.install('upysm')
+```
 
 Links
 -----
