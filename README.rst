@@ -100,12 +100,11 @@ See Unit Tests to see it working and extensively tested.
 
 Micropython support
 -------------------
-The library works with pyboards!
+The library works with pyboards!::
 
-```python
-import upip
-upip.install('upysm')
-```
+   import upip
+   upip.install('upysm')
+
 
 Links
 -----
