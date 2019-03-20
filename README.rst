@@ -14,6 +14,9 @@ Versatile and flexible Python State Machine library.
     :target: https://landscape.io/github/pgularski/pysm/master
     :alt: Code Health
 
+.. image:: https://api.codacy.com/project/badge/Grade/6f18f01639c242a0b83280a52245539d
+    :target: https://www.codacy.com/app/pgularski/pysm?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pgularski/pysm&amp;utm_campaign=Badge_Grade
+
 .. image:: https://readthedocs.org/projects/pysm/badge/?version=latest
     :target: http://pysm.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
