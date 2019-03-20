@@ -1,6 +1,10 @@
 pysm - Python State Machine
 ---------------------------
 
+.. image:: https://api.codacy.com/project/badge/Grade/a4276badc5ec4ed590b353fd7755178f
+   :alt: Codacy Badge
+   :target: https://app.codacy.com/app/pgularski/pysm?utm_source=github.com&utm_medium=referral&utm_content=pgularski/pysm&utm_campaign=Badge_Grade_Dashboard
+
 Versatile and flexible Python State Machine library.
 
 
