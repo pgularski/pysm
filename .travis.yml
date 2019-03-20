@@ -6,7 +6,8 @@ python:
   - "3.6"
   - "pypy"
 install:
-    - pip install pytest>=2.9.1, pytest-cov>=2.2.1, mock>=2.0.0 py
+    - pip install py>=1.5.0
+    - pip install pytest>=3.1.2, pytest-cov>=2.2.1, mock>=2.0.0
     - pip install coveralls
     - pip install pylint
     - pip install pep8
