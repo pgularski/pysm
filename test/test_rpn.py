@@ -55,7 +55,7 @@ class Calculator(object):
         y = self.sm.stack.pop()
         x = self.sm.stack.pop()
         # eval is evil
-        result = eval('float(x) %s float(y)' % operation)
+        result = eval('float({0}) {1} float({2})'.format(x, operation, y))
         self.sm.stack.push(result)
         return True
 

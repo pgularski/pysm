@@ -74,8 +74,21 @@ def patch_deque(deque_module):
 
 
 # Required to make it Micropython compatible
-if str(type(deque)).find('module') > 0:
-    deque = patch_deque(deque)
+try:
+    test_deque = deque(maxlen=1)
+except TypeError:
+    # TypeError: unexpected keyword argument 'maxlen'
+    if hasattr(deque, 'deque'):
+        deque = patch_deque(deque)
+    else:
+        class MockDequeModule(object):
+            deque = deque
+        deque = patch_deque(MockDequeModule)
+else:
+    del test_deque
+
+#  if str(type(deque)).find('module') > 0:
+#      deque = patch_deque(deque)
 
 
 logger = logging.getLogger(__name__)
