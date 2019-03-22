@@ -34,7 +34,7 @@ class Calculator(object):
         for char in string:
             self.sm.dispatch(Event('parse', input=char))
 
-    def caluculate(self, string):
+    def calculate(self, string):
         self.parse(string)
         return self.result
 
@@ -68,8 +68,8 @@ class Calculator(object):
 
 def test_calc_callbacks():
     calc = Calculator()
-    assert calc.caluculate(' 167 3 2 2 * * * 1 - =') == 2003
-    assert calc.caluculate('    167 3 2 2 * * * 1 - 2 / =') == 1001.5
-    assert calc.caluculate('    3   5 6 +  * =') == 33
-    assert calc.caluculate('        3    4       +     =') == 7
-    assert calc.caluculate('2 4 / 5 6 - * =') == -0.5
+    assert calc.calculate(' 167 3 2 2 * * * 1 - =') == 2003
+    assert calc.calculate('    167 3 2 2 * * * 1 - 2 / =') == 1001.5
+    assert calc.calculate('    3   5 6 +  * =') == 33
+    assert calc.calculate('        3    4       +     =') == 7
+    assert calc.calculate('2 4 / 5 6 - * =') == -0.5

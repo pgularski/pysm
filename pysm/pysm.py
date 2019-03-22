@@ -36,13 +36,14 @@ if str(type(defaultdict)).find('module') > 0:
     defaultdict = defaultdict.defaultdict
 
 
-# Required to make it Micropython compatible
-if str(type(deque)).find('module') > 0:
-    deque_module = deque
-
+def patch_deque(deque_module):
     class deque_maxlen(object):
         def __init__(self, iterable=None, maxlen=0):
             # pylint: disable=no-member
+            if iterable is None:
+                iterable = []
+            if maxlen in [None, 0]:
+                maxlen = float('Inf')
             self.q = deque_module.deque(iterable)
             self.maxlen = maxlen
 
@@ -62,7 +63,19 @@ if str(type(deque)).find('module') > 0:
             if len(self.q) > 0:
                 return True
             return False
-    deque = deque_maxlen
+
+        def __iter__(self):
+            return iter(self.q)
+
+        def __getitem__(self, key):
+            return self.q[key]
+
+    return deque_maxlen
+
+
+# Required to make it Micropython compatible
+if str(type(deque)).find('module') > 0:
+    deque = patch_deque(deque)
 
 
 logger = logging.getLogger(__name__)

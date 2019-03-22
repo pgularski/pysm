@@ -1385,3 +1385,57 @@ def test_transition_on_any_event():
 def enter_on_initialize():
     # TODO: Do I want this behaviour? It's not implemented atm.
     pass
+
+
+def test_micropython_deque():
+    from collections import deque
+    from pysm.pysm import patch_deque
+    from pysm import Stack
+
+    class MockMicropythonDequeModule(object):
+        def __init__(self, deque):
+            self.deque = deque
+
+    try:
+        old_deque = deque
+        assert repr(deque).find('collections.deque') > 0
+        deque = patch_deque(MockMicropythonDequeModule(deque))
+        assert repr(deque).find('collections.deque') < 0
+        assert repr(deque).find('deque_maxlen') > 0
+        stack = Stack()
+        stack.deque = deque()
+        assert repr(stack) == '[]'
+        stack.push(1)
+        assert repr(stack) == '[1]'
+        stack.pop()
+        assert repr(stack) == '[]'
+        stack.push('Mary')
+        stack.push('had')
+        stack.push('a')
+        stack.push('little')
+        stack.push('lamb')
+        assert repr(stack) == "['Mary', 'had', 'a', 'little', 'lamb']"
+        assert stack.pop() == 'lamb'
+        assert stack.pop() == 'little'
+        assert stack.pop() == 'a'
+        assert stack.pop() == 'had'
+        assert stack.pop() == 'Mary'
+
+        with pytest.raises(IndexError) as exc:
+            stack.pop()
+
+        with pytest.raises(IndexError) as exc:
+            stack.peek()
+        expected = 'deque index out of range'
+        assert expected in str(exc.value)
+
+        assert repr(stack) == '[]'
+
+        stack.push('Mary')
+        assert repr(stack) == "['Mary']"
+
+        assert stack.peek() == "Mary"
+        assert repr(stack) == "['Mary']"
+
+    finally:
+        deque = old_deque
