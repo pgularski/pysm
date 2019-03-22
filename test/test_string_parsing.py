@@ -150,3 +150,6 @@ def test():
                 'Operator<+>, Number<123.65>, Operator<->, String<hello>, '
                 'Operator<*>, Identifier<value>]')
     assert str(t.tokenList) == expected
+
+if __name__ == '__main__':
+    test()

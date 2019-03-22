@@ -36,6 +36,7 @@ if str(type(defaultdict)).find('module') > 0:
     defaultdict = defaultdict.defaultdict
 
 
+# Required to make it Micropython compatible
 def patch_deque(deque_module):
     class deque_maxlen(object):
         def __init__(self, iterable=None, maxlen=0):
@@ -86,9 +87,6 @@ except TypeError:
         deque = patch_deque(MockDequeModule)
 else:
     del test_deque
-
-#  if str(type(deque)).find('module') > 0:
-#      deque = patch_deque(deque)
 
 
 logger = logging.getLogger(__name__)

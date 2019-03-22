@@ -73,3 +73,6 @@ def test_calc_callbacks():
     assert calc.calculate('    3   5 6 +  * =') == 33
     assert calc.calculate('        3    4       +     =') == 7
     assert calc.calculate('2 4 / 5 6 - * =') == -0.5
+
+if __name__ == '__main__':
+    test_calc_callbacks()
