@@ -456,6 +456,7 @@ class StateMachine(State):
         self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.stack = Stack()
+        self._leaf_state = None
 
     def add_state(self, state, initial=False):
         '''Add a state to a state machine.
@@ -640,7 +641,8 @@ class StateMachine(State):
         :rtype: |State|
 
         '''
-        return self._get_leaf_state(self)
+        return self.root_machine._leaf_state
+        #  return self._get_leaf_state(self)
 
     def _get_leaf_state(self, state):
         while hasattr(state, 'state') and state.state is not None:
@@ -667,6 +669,8 @@ class StateMachine(State):
             for child_state in machine.states:
                 if isinstance(child_state, StateMachine):
                     machines.append(child_state)
+
+        self._leaf_state = self._get_leaf_state(self)
 
     def dispatch(self, event):
         '''Dispatch an event to a state machine.
@@ -705,6 +709,7 @@ class StateMachine(State):
             logger.debug('exiting %s', state.name)
             exit_event = Event('exit', propagate=False, source_event=event)
             exit_event.state_machine = self
+            self.root_machine._leaf_state = state
             state._on(exit_event)
             state.parent.state_stack.push(state)
             state.parent.state = state.parent.initial_state
@@ -724,6 +729,7 @@ class StateMachine(State):
             logger.debug('entering %s', state.name)
             enter_event = Event('enter', propagate=False, source_event=event)
             enter_event.state_machine = self
+            self.root_machine._leaf_state = state
             state._on(enter_event)
             state.parent.state = state
 
