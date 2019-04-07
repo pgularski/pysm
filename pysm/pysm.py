@@ -60,10 +60,10 @@ def patch_deque(deque_module):
             return getattr(self.q, name)
 
         def __bool__(self):
-            # pylint: disable=len-as-condition
-            if len(self.q) > 0:
-                return True
-            return False
+            return len(self.q) > 0
+
+        def __len__(self):
+            return len(self.q)
 
         def __iter__(self):
             return iter(self.q)

@@ -292,17 +292,19 @@ def test_hsm_simple_hsm_transition():
 def test_enter_exit_on_transitions():
     test_list = []
 
-    def on_enter(state, event):
-        test_list.append(('enter', state))
-
-    def on_exit(state, event):
-        test_list.append(('exit', state))
-
     m = StateMachine('m')
     # exit = m.add_state('exit', terminal=True)
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
     s2 = StateMachine('s2')
+
+    def on_enter(state, event):
+        assert state == m.leaf_state
+        test_list.append(('enter', state))
+
+    def on_exit(state, event):
+        assert state == m.leaf_state
+        test_list.append(('exit', state))
 
     s11 = State('s11')
     s21 = StateMachine('s21')
@@ -748,15 +750,16 @@ def test_state_stack():
     assert list(sm.state_stack.deque) == [s1, s2, s1]
     assert list(s3.state_stack.deque) == [s31]
 
-    # Brute force rollback of the previous state
-    s3.state = s3.state_stack.pop()
-    sm.state = sm.state_stack.pop()
-    assert sm.state == s1
-    assert sm.leaf_state == s1
-    assert s3.state == s31
-    assert s3.leaf_state == s31
-    assert list(sm.state_stack.deque) == [s1, s2]
-    assert list(s3.state_stack.deque) == []
+    # # Brute force rollback of the previous state
+    # # In fact, it's illegal to break the state machine integrity like this.
+    #  s3.state = s3.state_stack.pop()
+    #  sm.state = sm.state_stack.pop()
+    #  assert sm.state == s1
+    #  assert sm.leaf_state == s1
+    #  assert s3.state == s31
+    #  assert s3.leaf_state == s31
+    #  assert list(sm.state_stack.deque) == [s1, s2]
+    #  assert list(s3.state_stack.deque) == []
 
 
 def test_state_stack_high_tree():
@@ -1124,19 +1127,21 @@ def test_event_propagate():
 def test_event_propagate_enter_exit():
     data = []
 
-    def do(state, event):
-        event.cargo['source_event'].cargo['data'].append(state)
-
-    def do_with_propagate(state, event):
-        event.cargo['source_event'].cargo['data'].append(state)
-        event.propagate = True
-
     m = StateMachine('m')
     s0 = StateMachine('s0')
     s1 = StateMachine('s1')
     s2 = StateMachine('s2')
     s3 = StateMachine('s3')
     s4 = State('s4')
+
+    def do(state, event):
+        event.cargo['source_event'].cargo['data'].append(state)
+        assert state == m.leaf_state
+
+    def do_with_propagate(state, event):
+        event.cargo['source_event'].cargo['data'].append(state)
+        event.propagate = True
+        assert state == m.leaf_state
 
     m.add_state(s0, initial=True)
     s0.add_state(s1, initial=True)
@@ -1170,10 +1175,12 @@ def test_event_propagate_enter_exit():
 def test_previous_state_with_source_event():
     def do(state, event):
         event.cargo['source_event'].cargo['data'].append(state)
+        assert state == m.leaf_state
 
     def do_with_propagate(state, event):
         event.cargo['source_event'].cargo['data'].append(state)
         event.propagate = True
+        assert state == m.leaf_state
 
     m = StateMachine('m')
     s0 = StateMachine('s0')
@@ -1243,6 +1250,7 @@ def test_state_machine_reference_present_in_event_with_nested_machines():
 
     def do(state, event):
         assert event.state_machine == m
+        assert state == m.leaf_state
 
     for state in s0, s1, s2:
         state.handlers = {'enter': do, 'exit': do, 'do': do}
@@ -1267,33 +1275,6 @@ def test_add_states_and_set_initial_state():
 
 
 def test_state_instance_passed_to_an_event_handler():
-    def on_enter(state, event):
-        source_event = event.cargo['source_event']
-        source_event.cargo['test_list'].append(('enter', state))
-
-    def on_exit(state, event):
-        source_event = event.cargo['source_event']
-        source_event.cargo['test_list'].append(('exit', state))
-
-    def before(state, event):
-        assert state == s1
-
-    def action(state, event):
-        assert state == s1
-
-    def after(state, event):
-        assert state == s2
-
-    def on_internal(state, event):
-        assert state == s1
-
-    def do(state, event):
-        assert state == m
-
-    def condition(state, event):
-        assert state == s1
-        return True
-
     m = StateMachine('m')
     s0 = StateMachine('s0')
     s1 = State('s1')
@@ -1301,6 +1282,42 @@ def test_state_instance_passed_to_an_event_handler():
     m.add_state(s0, initial=True)
     s0.add_state(s1, initial=True)
     s0.add_state(s2)
+
+    def on_enter(state, event):
+        source_event = event.cargo['source_event']
+        source_event.cargo['test_list'].append(('enter', state))
+        assert state == m.leaf_state
+
+    def on_exit(state, event):
+        source_event = event.cargo['source_event']
+        source_event.cargo['test_list'].append(('exit', state))
+        assert state == m.leaf_state
+
+    def before(state, event):
+        assert state == s1
+        assert state == m.leaf_state
+
+    def action(state, event):
+        assert state == s1
+        assert state == m.leaf_state
+
+    def after(state, event):
+        assert state == s2
+        assert state == m.leaf_state
+
+    def on_internal(state, event):
+        assert state == s1
+        assert state == m.leaf_state
+
+    def do(state, event):
+        # It's an action on the top machine, the `leaf_state` is NOT `state`
+        assert state != m.leaf_state
+        assert state == m
+
+    def condition(state, event):
+        assert state == s1
+        assert state == m.leaf_state
+        return True
 
     m.add_transition(s0, s0, events='a')
     s0.add_transition(s1, None, events=['internal'],
@@ -1439,6 +1456,64 @@ def test_micropython_deque():
 
     finally:
         deque = old_deque
+
+
+def test_micropython_deque_maxlen_exceeded():
+    from collections import deque
+    from pysm.pysm import patch_deque
+    from pysm import Stack
+
+    class MockMicropythonDequeModule(object):
+        def __init__(self, deque):
+            self.deque = deque
+
+    try:
+        old_deque = deque
+        assert repr(deque).find('collections.deque') > 0
+        deque = patch_deque(MockMicropythonDequeModule(deque))
+        assert repr(deque).find('collections.deque') < 0
+        assert repr(deque).find('deque_maxlen') > 0
+        stack = Stack()
+        stack.deque = deque(maxlen=2)
+        assert repr(stack) == '[]'
+        assert bool(stack.deque) is False
+        stack.push(1)
+        assert repr(stack) == '[1]'
+        assert bool(stack.deque) is True
+        stack.pop()
+        assert repr(stack) == '[]'
+        assert bool(stack.deque) is False
+        stack.push('Mary')
+        stack.push('had')
+        assert repr(stack) == "['Mary', 'had']"
+        stack.push('a')
+        assert repr(stack) == "['had', 'a']"
+        stack.push('little')
+        assert repr(stack) == "['a', 'little']"
+        stack.push('lamb')
+        assert repr(stack) == "['little', 'lamb']"
+        assert stack.pop() == 'lamb'
+        assert stack.pop() == 'little'
+
+        with pytest.raises(IndexError) as exc:
+            stack.pop()
+
+        with pytest.raises(IndexError) as exc:
+            stack.peek()
+        expected = 'deque index out of range'
+        assert expected in str(exc.value)
+
+        assert repr(stack) == '[]'
+
+        stack.push('Mary')
+        assert repr(stack) == "['Mary']"
+
+        assert stack.peek() == "Mary"
+        assert repr(stack) == "['Mary']"
+
+    finally:
+        deque = old_deque
+
 
 
 def test_leaf_state_from_action_method():
