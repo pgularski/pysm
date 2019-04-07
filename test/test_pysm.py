@@ -1517,37 +1517,37 @@ def test_micropython_deque_maxlen_exceeded():
 
 
 def test_leaf_state_from_action_method():
-    class TestSM():
-	def __init__(self):
-	    self.state_1 = None
-	    self.state_2 = None
-	    self.sm = self._get_state_machine()
+    class TestSM(object):
+        def __init__(self):
+            self.state_1 = None
+            self.state_2 = None
+            self.sm = self._get_state_machine()
 
-	def _get_state_machine(self):
-	    state_machine = StateMachine('Test')
-	    state_1 = State('One')
-	    state_2 = State('Two')
+        def _get_state_machine(self):
+            state_machine = StateMachine('Test')
+            state_1 = State('One')
+            state_2 = State('Two')
 
             self.state_1 = state_1
             self.state_2 = state_2
 
-	    state_machine.add_state(state_1, initial=True)
-	    state_machine.add_state(state_2)
-	    state_machine.add_transition(state_1, state_2, events=['change_state'])
-	    state_machine.add_transition(state_2, state_1, events=['change_state'])
-	    state_1.handlers = {
-                    'enter': self.entry_func,
-                    'exit': self.exit_func
-                    }
-	    state_2.handlers = {
-                    'enter': self.entry_func,
-                    'exit': self.exit_func
-                    }
+            state_machine.add_state(state_1, initial=True)
+            state_machine.add_state(state_2)
+            state_machine.add_transition(state_1, state_2, events=['change_state'])
+            state_machine.add_transition(state_2, state_1, events=['change_state'])
+            state_1.handlers = {
+                        'enter': self.entry_func,
+                        'exit': self.exit_func
+                        }
+            state_2.handlers = {
+                        'enter': self.entry_func,
+                        'exit': self.exit_func
+                        }
 
-	    state_machine.initialize()
-	    return state_machine
+            state_machine.initialize()
+            return state_machine
 
-	def entry_func(self, state, event):
+        def entry_func(self, state, event):
             if state is self.state_1:
                 assert self.sm.leaf_state == self.state_1
             else:
@@ -1559,14 +1559,14 @@ def test_leaf_state_from_action_method():
             else:
                 assert self.sm.leaf_state == self.state_2
 
-	def test(self):
-	    assert self.sm.leaf_state == self.state_1
-	    self.sm.dispatch(Event('change_state'))
-	    assert self.sm.leaf_state == self.state_2
-	    self.sm.dispatch(Event('change_state'))
-	    assert self.sm.leaf_state == self.state_1
-	    self.sm.dispatch(Event('change_state'))
-	    assert self.sm.leaf_state == self.state_2
+        def test(self):
+            assert self.sm.leaf_state == self.state_1
+            self.sm.dispatch(Event('change_state'))
+            assert self.sm.leaf_state == self.state_2
+            self.sm.dispatch(Event('change_state'))
+            assert self.sm.leaf_state == self.state_1
+            self.sm.dispatch(Event('change_state'))
+            assert self.sm.leaf_state == self.state_2
 
     TEST_SM = TestSM()
     TEST_SM.test()
