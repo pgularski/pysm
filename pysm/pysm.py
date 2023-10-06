@@ -450,13 +450,25 @@ class StateMachine(State):
 
     def __init__(self, name):
         super(StateMachine, self).__init__(name)
-        self.states = set()
+        # store member states in a dict so that they are easily retrievable by name
+        self._state_dict = {}
         self.state = None
         self._transitions = TransitionsContainer(self)
         self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.stack = Stack()
         self._leaf_state = None
+
+    @property
+    def states(self):
+        return self._state_dict.values()
+
+    def substate(self, name):
+        """ Retrieve a substate by name """
+        if name in self._state_dict:
+            return self._state_dict[name]
+        else:
+            return None
 
     def add_state(self, state, initial=False):
         '''Add a state to a state machine.
@@ -473,7 +485,7 @@ class StateMachine(State):
         Validator(self).validate_add_state(state, initial)
         state.initial = initial
         state.parent = self
-        self.states.add(state)
+        self._state_dict[state.name] = state
 
     def add_states(self, *states):
         '''Add `states` to the |StateMachine|.
