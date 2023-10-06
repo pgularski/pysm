@@ -324,7 +324,13 @@ class TransitionsContainer(object):
 
     def get(self, event):
         key = (self._machine.state, event.name, event.input)
-        return self._get_transition_matching_condition(key, event)
+        transition = self._get_transition_matching_condition(key, event)
+        if transition is not None:
+            return transition
+        else:
+            # also look from transitions defined for this state itself
+            key = (self._machine, event.name, event.input)
+            return self._get_transition_matching_condition(key, event)
 
     def _get_transition_matching_condition(self, key, event):
         from_state = self._machine.leaf_state
@@ -677,6 +683,7 @@ class StateMachine(State):
         while machines:
             machine = machines.popleft()
             Validator(self).validate_initial_state(machine)
+            # TODO: Is this the place to add entry actions for initial states?
             machine.state = machine.initial_state
             for child_state in machine.states:
                 if isinstance(child_state, StateMachine):
@@ -826,7 +833,7 @@ class Validator(object):
         self._validate_input(input)
 
     def _validate_from_state(self, from_state):
-        if from_state not in self.state_machine.states:
+        if from_state not in self.state_machine.states and from_state is not self.state_machine:
             msg = 'Unable to add transition from unknown state "{0}"'.format(
                 from_state.name)
             self._raise(msg)

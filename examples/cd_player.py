@@ -73,16 +73,13 @@ class CdPlayer(HybridSuperState):
     def __init__(self, controller):
         super().__init__(controller)
 
-        self.add_state(PointlessContainer(controller), initial=True)
+        self.add_state(NotBroken(controller), initial=True)
+        self.add_state(Broken(controller))
 
-        # I would MUCH prefer to define a single transition from the superstate, but pysm
-        # is giving me difficulty using `self` as the from_state there.
-        # This may be related to handling local vs external transition syntax
+        # I believe that this is interpreted with local (as opposed to external) transition syntax
         # https://en.wikipedia.org/wiki/UML_state_machine#Local_versus_external_transitions
         # TODO: Consider modifying psym library to support this
-        self.add_transition(from_state=self.substate('PointlessContainer'),
-                            to_state=self.substate('PointlessContainer').substate('Broken'),
-                            events=[CdEvent.HAMMER])
+        self.add_transition(from_state=self, to_state=self.substate('Broken'), events=[CdEvent.HAMMER])
 
         # Final step
         self.initialize()
@@ -96,8 +93,12 @@ class CdPlayer(HybridSuperState):
         super().dispatch(pysm.Event('tick'))
 
 
-class PointlessContainer(HybridSuperState):
-    """ A pointless container state to work around the fact that pysm won't let me add transitions to `self` """
+class Broken(HybridSuperState):
+    pass
+
+
+class NotBroken(HybridSuperState):
+    pass
 
     def __init__(self, controller):
         super().__init__(controller)
@@ -106,7 +107,6 @@ class PointlessContainer(HybridSuperState):
         self.add_state(Empty(controller))
         self.add_state(Playing(controller))
         self.add_state(Paused(controller))
-        self.add_state(Broken(controller))
 
         # I would MUCH rather define these transitions as part of the origin state's class!
         # This feels like I have to define everything one level higher than I would like.
@@ -148,10 +148,6 @@ class Playing(HybridState):
 
 
 class Paused(HybridState):
-    pass
-
-
-class Broken(HybridState):
     pass
 
 
