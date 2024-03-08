@@ -863,6 +863,71 @@ class StateMachine(State):
 
         return data
 
+    def _state_to_dot(self,state,data:str='')->str:
+        # Generate a mermaid diagram for a single state
+
+        data += f'subgraph {state.name} '
+        data += '{\n'
+        data += '\tcluster=true;\n'
+        data += f'\tlabel="{state.name}";\n\n'
+
+        # Initial state
+        # data += f'\t[*] -> {state.initial_state.name}\n'
+
+        # Add in all of hte transitions
+        for event,trans in state._transitions._transitions.items():
+            t = trans[0]
+            src = t['from_state'].name
+            dest = t['to_state']
+            if dest is None:
+                dest = src
+            else:
+                dest = dest.name
+
+            # Event
+            evt = str(event[1])
+            if t['condition'].__name__ != '_nop':
+                evt += f"({t['condition'].__name__})"
+
+            data += f'\t{src} -> {dest} [label="{evt}"];\n'
+        data += '}\n'
+
+        # Handle substates.
+        if len(state.states) > 0:
+            for s in self.states:
+                if isinstance(s,StateMachineCustom):
+                    data = s._state_to_dot(s,data)
+
+        return data
+
+    def to_graphviz(self,filename:str|None=None)->str:
+        """
+        Generate a graphviz diagram of the state machine
+        """
+
+        # https://stackoverflow.com/questions/2012036/graphviz-how-to-connect-subgraphs
+
+        if filename is None:
+            filename = f"HSM-{self.name}.gv"
+        if not isinstance(filename,str):
+            raise ValueError("Filename must be a string")
+        filename = Path(filename).with_suffix('.gv') # type: ignore
+
+        data = f"digraph {self.name}" + ' {\n'
+        data += '\tfontname="sans-serif"\n'
+        data += '\tnode [shape=Mrecord,fontname="sans-serif"]\n'
+        data += '\tedge [fontname="sans-serif"]\n'
+
+        data = self._state_to_dot(self,data)
+
+        # Close out dot
+        data += "}"
+
+        # Write to file
+        with open(str(filename),'w') as f:
+            f.write(data)
+
+        return data
 class Validator(object):
     def __init__(self, state_machine):
         self.state_machine = state_machine
