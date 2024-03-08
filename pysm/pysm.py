@@ -895,7 +895,7 @@ class StateMachine(State):
         # Handle substates.
         if len(state.states) > 0:
             for s in self.states:
-                if isinstance(s,StateMachineCustom):
+                if isinstance(s,StateMachine):
                     data = s._state_to_dot(s,data)
 
         return data
