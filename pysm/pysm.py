@@ -25,9 +25,12 @@ Goals:
 .. |Callable| replace:: :class:`~collections.Callable`
 
 '''
-import logging
-import sys
 from collections import defaultdict, deque
+import logging
+from pathlib import Path
+import sys
+import textwrap
+
 
 
 # Required to make it Micropython compatible
@@ -457,6 +460,18 @@ class StateMachine(State):
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.stack = Stack()
         self._leaf_state = None
+        self._description = ""
+
+    @property
+    def description(self)->str:
+        return self._description
+
+    @description.setter
+    def description(self,desc:str):
+        if not isinstance(desc,str):
+            raise ValueError("Description must be a string")
+        self._description = desc
+
 
     def add_state(self, state, initial=False):
         '''Add a state to a state machine.
@@ -766,6 +781,87 @@ class StateMachine(State):
         except IndexError:
             return
 
+    def _state_to_uml(self,state,data:str='')->str:
+        """
+        Generate a mermaid diagram for a single state
+        """
+
+        if not isinstance(state,StateMachine):
+            return data
+
+        data += f'state {state.name} '
+        data += '{\n'
+
+        # State descriptions
+        for s in state.states:
+            if isinstance(s,StateMachine):
+                desc = s.description
+                if desc != "":
+                    desc = "\\n".join(textwrap.wrap(desc, width=len(s.name)*4))
+                data += f'\t{s.name}: {desc}\n'
+
+        # Initial state
+        data += f'\t[*] --> {state.initial_state.name}\n'
+
+        # Add in all of the transitions
+        if hasattr(state,"_transitions"):
+            for event,trans in state._transitions._transitions.items():
+                t = trans[0]
+                src = t['from_state'].name
+                dest = t['to_state']
+                if dest is None:
+                    dest = src
+                else:
+                    dest = dest.name
+
+                # Event
+                evt = str(event[1])
+                if t['condition'].__name__ != '_nop':
+                    evt += f"({t['condition'].__name__})"
+
+                data += f"\t{src} --> {dest}: {evt}\n"
+        data += '}\n'
+
+        # Handle substates.
+        for s in self.states:
+            if isinstance(s,StateMachine):
+                data = s._state_to_uml(s,data)
+
+        return data
+
+    def to_plantuml(self,filename:str|None=None) -> str:
+        """
+        Generates PlantUML state diagram.
+
+        PlantUML state diagrams:
+        https://plantuml.com/state-diagram
+
+        VSCode viewer plugin:
+        https://marketplace.visualstudio.com/items?itemName=well-ar.plantuml
+        Note: Viewer plugin defaults to port 30001 on localhost.
+
+        To run the PlantUML server in a Docker container:
+        docker run -d -p 30001:8080 plantuml/plantuml-server:jetty
+        """
+
+        if filename is None:
+            filename = f"HSM-{self.name}.puml"
+        if not isinstance(filename,str):
+            raise ValueError("Filename must be a string")
+        filename = Path(filename).with_suffix('.puml') # type: ignore
+
+        data = "@startuml\n"
+        data += f"\t{self.name}: {self.description}\n"
+        data = self._state_to_uml(self,data)
+
+        # Close out uml
+        data += "@enduml\n"
+
+        # Write to file
+        with open(str(filename),'w') as f:
+            f.write(data)
+
+        return data
 
 class Validator(object):
     def __init__(self, state_machine):

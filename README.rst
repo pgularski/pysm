@@ -101,12 +101,30 @@ Read the docs for API documentation and examples - http://pysm.readthedocs.io/
 
 See Unit Tests to see it working and extensively tested.
 
-Micropython support
+Micropython Support
 -------------------
 The library works with pyboards!::
 
    import upip
    upip.install('upysm')
+
+
+PlanUML Statechart Support
+--------------------------
+The library can generate PlantUML statechart diagrams (https://plantuml.com/state-diagram/)
+directly from the state machine object by calling the `to_plantuml` method on the state machine
+object.
+
+To view the diagrams, you can:
+* Use the PlantUML online editor (http://www.plantuml.com/plantuml/uml/).
+* Run a local server via Docker:
+
+```bash
+docker run -d -p 30001:8080 plantuml/plantuml-server:jetty
+```
+
+* And use an integrated VSCode previewer: https://marketplace.visualstudio.com/items?itemName=well-ar.plantuml
+    * Note that the VSCode plugin expects the server on `localhost:30001`.
 
 
 Links
