@@ -455,7 +455,7 @@ class StateMachine(State):
         self._transitions = TransitionsContainer(self)
         self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
-        self.stack = Stack()
+        self.stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self._leaf_state = None
 
     def add_state(self, state, initial=False):
