@@ -45,7 +45,7 @@ def patch_deque(deque_module):
                 iterable = []
             if maxlen in [None, 0]:
                 maxlen = float('Inf')
-            self.q = deque_module.deque(iterable)
+            self.q = deque_module.deque(iterable, maxlen)
             self.maxlen = maxlen
 
         def pop(self):
@@ -76,9 +76,10 @@ def patch_deque(deque_module):
 
 # Required to make it Micropython compatible
 try:
+    # if this throws an error, it means we are on MicroPython
     test_deque = deque(maxlen=1)
 except TypeError:
-    # TypeError: unexpected keyword argument 'maxlen'
+    # TypeError: function doesn't take keyword arguments
     if hasattr(deque, 'deque'):
         deque = patch_deque(deque)
     else:
@@ -455,7 +456,7 @@ class StateMachine(State):
         self._transitions = TransitionsContainer(self)
         self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
-        self.stack = Stack()
+        self.stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self._leaf_state = None
 
     def add_state(self, state, initial=False):
