@@ -1,6 +1,7 @@
-import codecs
 import os
-from setuptools import setup, find_packages, Command
+import codecs
+
+from setuptools import find_packages, setup
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
@@ -26,10 +27,10 @@ setup(
     long_description=read('README.rst'),
     long_description_content_type="text/x-rst",
     packages=find_packages(),
+    package_data={'pysm': ['*.pyi']},
     zip_safe=False,
     classifiers=[
         'Development Status :: 3 - Alpha',
-        'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
@@ -48,7 +49,5 @@ setup(
         'Topic :: Software Development',
         'Topic :: Software Development :: Libraries',
     ],
-    setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'pytest-cov', 'mock'],
     keywords='finite state machine automaton fsm hsm pda',
 )
