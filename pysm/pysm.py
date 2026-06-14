@@ -44,7 +44,7 @@ def patch_deque(deque_module):
             if iterable is None:
                 iterable = []
             if maxlen in [None, 0]:
-                maxlen = float('Inf')
+                maxlen = getattr(sys, 'maxsize', 2 ** 31 - 1)
             self.q = deque_module.deque(iterable, maxlen)
             self.maxlen = maxlen
 
