@@ -34,7 +34,6 @@ try:
 except ImportError:
     class defaultdict(dict):
         def __init__(self, default_factory=None):
-            dict.__init__(self)
             self.default_factory = default_factory
 
         def __getitem__(self, key):
