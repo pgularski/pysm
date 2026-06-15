@@ -4,6 +4,7 @@ import sys
 
 def test_core_import_does_not_load_optional_modules():
     for name in [
+            'pysm.aio',
             'pysm.queued',
             'pysm.serialization',
             'pysm.builder',
@@ -13,6 +14,7 @@ def test_core_import_does_not_load_optional_modules():
     import pysm
     importlib.reload(pysm)
 
+    assert 'pysm.aio' not in sys.modules
     assert 'pysm.queued' not in sys.modules
     assert 'pysm.serialization' not in sys.modules
     assert 'pysm.builder' not in sys.modules

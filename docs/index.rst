@@ -8,7 +8,7 @@ Python State Machine
 ``pysm`` is a tiny, explicit hierarchical state machine library. The classic
 core remains dependency-free and suitable for small runtimes, while optional
 modules provide run-to-completion event scheduling, thread-safe dispatch,
-serialization, and builder ergonomics.
+async dispatch, serialization, and builder ergonomics.
 
 Core imports stay small:
 
@@ -22,6 +22,7 @@ Advanced behavior is opt-in:
 
    from pysm.queued import QueuedStateMachine
    from pysm.queued import ThreadSafeQueuedStateMachine
+   from pysm.aio import AsyncQueuedStateMachine
    from pysm.serialization import snapshot, restore
    from pysm.builder import StateMachineBuilder
 

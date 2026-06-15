@@ -1,0 +1,13 @@
+from typing import Optional
+
+from .pysm import Event, StateMachine
+
+class AsyncQueuedStateMachine(StateMachine):
+    max_internal_steps: Optional[int]
+    def __init__(self, name: str,
+                 max_internal_steps: Optional[int] = ...) -> None: ...
+    async def dispatch(self, event: Event) -> None: ...
+    async def set_previous_leaf_state(
+        self, event: Optional[Event] = ...) -> None: ...
+    async def revert_to_previous_leaf_state(
+        self, event: Optional[Event] = ...) -> None: ...

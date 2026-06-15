@@ -4,7 +4,7 @@ pysm - Python State Machine
 ``pysm`` is a tiny, explicit hierarchical state machine library for Python.
 It keeps the original core small and dependency-free, while offering optional
 modules for run-to-completion event scheduling, thread-safe dispatch,
-serialization, and builder ergonomics.
+async dispatch, serialization, and builder ergonomics.
 
 The default import remains intentionally lean:
 
@@ -58,6 +58,10 @@ Core vs Optional Modules
      - ``from pysm.queued import ThreadSafeQueuedStateMachine``
      - Queued dispatch protected by ``threading.RLock``
      - CPython-only
+   * - Async queued runtime
+     - ``from pysm.aio import AsyncQueuedStateMachine``
+     - Run-to-completion dispatch for ``asyncio`` callbacks
+     - CPython 3.7+ only
    * - Serialization
      - ``from pysm.serialization import snapshot, restore``
      - Snapshot active state and history using stable state paths
@@ -179,6 +183,42 @@ threads from dispatching into the same machine. Async support is intentionally
 not part of this class.
 
 
+Async Queued Dispatch
+---------------------
+
+For ``asyncio`` applications, use the async queued runtime:
+
+.. code-block:: python
+
+   from pysm import Event, State
+   from pysm.aio import AsyncQueuedStateMachine
+
+   machine = AsyncQueuedStateMachine('m')
+   idle = State('idle')
+   ready = State('ready')
+
+   async def on_enter_ready(state, event):
+       await machine.dispatch(Event('validate'))
+
+   ready.handlers = {'enter': on_enter_ready}
+
+   machine.add_state(idle, initial=True)
+   machine.add_state(ready)
+   machine.add_transition(idle, ready, events=['go'])
+   machine.add_transition(ready, None, events=['validate'])
+   machine.initialize()
+
+   await machine.dispatch(Event('go'))
+
+``AsyncQueuedStateMachine`` supports both synchronous and asynchronous
+handlers, conditions, and transition callbacks. It serializes external
+dispatches with ``asyncio.Lock`` and treats events raised from the currently
+running transition task as internal events. Use one event loop per machine.
+If a handler creates a separate task that dispatches into the same machine,
+that dispatch is external and waits until the current run-to-completion cycle
+finishes.
+
+
 Snapshot And Restore
 --------------------
 
@@ -232,9 +272,9 @@ The MicroPython-oriented target should stay core-only:
 
    from pysm import StateMachine, State, Event
 
-Do not copy optional modules such as ``pysm.queued``, ``pysm.serialization``,
-or ``pysm.builder`` into a constrained device build unless you explicitly need
-them and have measured the memory cost.
+Do not copy optional modules such as ``pysm.queued``, ``pysm.aio``,
+``pysm.serialization``, or ``pysm.builder`` into a constrained device build
+unless you explicitly need them and have measured the memory cost.
 
 
 Tests
