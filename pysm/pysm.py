@@ -27,7 +27,22 @@ Goals:
 
 '''
 import sys
-from collections import defaultdict, deque
+from collections import deque
+
+try:
+    from collections import defaultdict
+except ImportError:
+    class defaultdict(dict):
+        def __init__(self, default_factory=None):
+            super(defaultdict, self).__init__()
+            self.default_factory = default_factory
+
+        def __missing__(self, key):
+            if self.default_factory is None:
+                raise KeyError(key)
+            value = self.default_factory()
+            self[key] = value
+            return value
 
 try:
     import logging

@@ -1755,6 +1755,37 @@ def test_core_imports_without_logging_module(monkeypatch):
     module.logger.info('available')
 
 
+def test_core_imports_without_collections_defaultdict(monkeypatch):
+    import builtins
+    import collections
+    import importlib.util
+    import os
+    import types
+
+    real_import = builtins.__import__
+    collections_without_defaultdict = types.ModuleType('collections')
+    collections_without_defaultdict.deque = collections.deque
+
+    def import_without_defaultdict(name, *args, **kwargs):
+        if name == 'collections':
+            return collections_without_defaultdict
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', import_without_defaultdict)
+
+    module_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'pysm', 'pysm.py')
+    spec = importlib.util.spec_from_file_location(
+        'pysm_without_defaultdict', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    data = module.defaultdict(list)
+    data['events'].append('go')
+
+    assert data['events'] == ['go']
+
+
 def test_leaf_state_from_action_method():
     class TestSM(object):
         def __init__(self):
