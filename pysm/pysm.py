@@ -1,3 +1,4 @@
+# pyright: basic
 '''Python State Machine
 
 The goal of this library is to give you a close to the State Pattern
