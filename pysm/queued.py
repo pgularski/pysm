@@ -4,8 +4,9 @@ The classes in this module deliberately live outside ``pysm.__init__`` so the
 classic core import remains tiny and suitable for MicroPython-oriented builds.
 '''
 from collections import deque
+from typing import Any, Deque, Optional
 
-from .pysm import StateMachine, StateMachineException
+from .pysm import Event, StateMachine, StateMachineException
 
 
 class QueuedStateMachine(StateMachine):
@@ -16,14 +17,15 @@ class QueuedStateMachine(StateMachine):
     internal queue is always drained before the next external event is handled.
     '''
 
-    def __init__(self, name, max_internal_steps=None):
+    def __init__(self, name: str,
+                 max_internal_steps: Optional[int] = None) -> None:
         super(QueuedStateMachine, self).__init__(name)
-        self.max_internal_steps = max_internal_steps
-        self._internal_queue = deque()
-        self._external_queue = deque()
-        self._is_processing = False
+        self.max_internal_steps: Optional[int] = max_internal_steps
+        self._internal_queue: Deque[Event] = deque()
+        self._external_queue: Deque[Event] = deque()
+        self._is_processing: bool = False
 
-    def dispatch(self, event):
+    def dispatch(self, event: Event) -> None:
         '''Enqueue ``event`` and process pending work to completion.'''
         if self._is_processing:
             self._internal_queue.append(event)
@@ -55,7 +57,7 @@ class QueuedStateMachine(StateMachine):
         finally:
             self._is_processing = False
 
-    def _clear_queues(self):
+    def _clear_queues(self) -> None:
         while self._internal_queue:
             self._internal_queue.popleft()
         while self._external_queue:
@@ -70,12 +72,13 @@ class ThreadSafeQueuedStateMachine(QueuedStateMachine):
     of this class.
     '''
 
-    def __init__(self, name, max_internal_steps=None):
+    def __init__(self, name: str,
+                 max_internal_steps: Optional[int] = None) -> None:
         super(ThreadSafeQueuedStateMachine, self).__init__(
             name, max_internal_steps=max_internal_steps)
         import threading
-        self._execution_lock = threading.RLock()
+        self._execution_lock: Any = threading.RLock()
 
-    def dispatch(self, event):
+    def dispatch(self, event: Event) -> None:
         with self._execution_lock:
             return QueuedStateMachine.dispatch(self, event)

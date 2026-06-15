@@ -1,6 +1,8 @@
-from typing import Any, Hashable, Iterable, Optional
+from typing import Any, Callable, Hashable, Iterable, Optional
 
-from .pysm import Callback, StateMachine
+from .pysm import StateMachine
+
+_Callback = Callable[[Any, Any], Any]
 
 class StateMachineBuilder(object):
     root: StateMachine
@@ -16,9 +18,9 @@ class StateMachineBuilder(object):
         to_path: Optional[Any],
         events: Iterable[Hashable],
         input: Optional[Iterable[Hashable]] = ...,
-        action: Optional[Callback] = ...,
-        condition: Optional[Callback] = ...,
-        before: Optional[Callback] = ...,
-        after: Optional[Callback] = ...,
+        action: Optional[_Callback] = ...,
+        condition: Optional[_Callback] = ...,
+        before: Optional[_Callback] = ...,
+        after: Optional[_Callback] = ...,
     ) -> StateMachineBuilder: ...
     def build(self, initialize: bool = ...) -> StateMachine: ...

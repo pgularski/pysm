@@ -1,9 +1,11 @@
 from typing import Any, Callable, Dict, Hashable, Iterable, Optional
 
-Callback = Callable[[Any, Any], Any]
+_Callback = Callable[[Any, Any], Any]
+_Transition = Dict[str, Any]
 
 class AnyEvent(object): ...
 any_event: AnyEvent
+logger: Any
 
 class StateMachineException(Exception): ...
 
@@ -19,7 +21,7 @@ class Event(object):
 class State(object):
     parent: Optional[StateMachine]
     name: str
-    handlers: Dict[Hashable, Callback]
+    handlers: Dict[Hashable, _Callback]
     initial: bool
     def __init__(self, name: str) -> None: ...
     def register_handlers(self) -> None: ...
@@ -36,6 +38,8 @@ class StateMachine(State):
     STACK_SIZE: int
     states: Any
     state: Optional[State]
+    _transitions: Any
+    _leaf_state: Optional[State]
     state_stack: Stack
     leaf_state_stack: Stack
     stack: Stack
@@ -53,13 +57,27 @@ class StateMachine(State):
         to_state: Optional[State],
         events: Iterable[Hashable],
         input: Optional[Iterable[Hashable]] = ...,
-        action: Optional[Callback] = ...,
-        condition: Optional[Callback] = ...,
-        before: Optional[Callback] = ...,
-        after: Optional[Callback] = ...,
+        action: Optional[_Callback] = ...,
+        condition: Optional[_Callback] = ...,
+        before: Optional[_Callback] = ...,
+        after: Optional[_Callback] = ...,
     ) -> None: ...
     @property
     def leaf_state(self) -> State: ...
+    def _get_leaf_state(self, state: State) -> State: ...
+    def _get_transition(self, event: Event) -> Optional[_Transition]: ...
+    def _exit_states(
+        self,
+        event: Optional[Event],
+        from_state: State,
+        to_state: Optional[State],
+    ) -> Optional[State]: ...
+    def _enter_states(
+        self,
+        event: Optional[Event],
+        top_state: Optional[State],
+        to_state: Optional[State],
+    ) -> None: ...
     def initialize(self) -> None: ...
     def dispatch(self, event: Event) -> None: ...
     def set_previous_leaf_state(self, event: Optional[Event] = ...) -> None: ...

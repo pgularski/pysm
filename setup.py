@@ -27,7 +27,7 @@ setup(
     long_description=read('README.rst'),
     long_description_content_type="text/x-rst",
     packages=find_packages(),
-    package_data={'pysm': ['*.pyi']},
+    package_data={'pysm': ['*.pyi', 'py.typed']},
     python_requires='>=3.7',
     zip_safe=False,
     classifiers=[

@@ -33,7 +33,7 @@ from collections import defaultdict, deque
 # Required to make it Micropython compatible
 if str(type(defaultdict)).find('module') > 0:
     # pylint: disable=no-member
-    defaultdict = defaultdict.defaultdict
+    defaultdict = defaultdict.defaultdict  # type: ignore[attr-defined]
 
 
 # Required to make it Micropython compatible
@@ -172,7 +172,7 @@ class Event(object):
         self.propagate = True
         self.cargo = cargo
         # This must be always the root machine
-        self.state_machine = None
+        self.state_machine = None  # type: object
 
     def __repr__(self):
         return '<Event {0}, input={1}, cargo={2} ({3})>'.format(
@@ -341,7 +341,10 @@ class TransitionsContainer(object):
 
 class Stack(object):
     def __init__(self, maxlen=None):
-        self.deque = deque(maxlen=maxlen)
+        if maxlen is None:
+            self.deque = deque()
+        else:
+            self.deque = deque(maxlen=maxlen)
 
     def pop(self):
         return self.deque.pop()
@@ -620,7 +623,9 @@ class StateMachine(State):
                 self._transitions.add(key, transition)
 
     def _get_transition(self, event):
-        machine = self.leaf_state.parent
+        leaf_state = self.leaf_state
+        assert leaf_state is not None
+        machine = leaf_state.parent
         while machine:
             transition = machine._transitions.get(event)
             if transition:
@@ -685,6 +690,7 @@ class StateMachine(State):
         '''
         event.state_machine = self
         leaf_state_before = self.leaf_state
+        assert leaf_state_before is not None
         leaf_state_before._on(event)
         transition = self._get_transition(event)
         if transition is None:
@@ -702,6 +708,7 @@ class StateMachine(State):
         if to_state is None:
             return None
         state = self.leaf_state
+        assert state is not None
         self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and
@@ -712,9 +719,11 @@ class StateMachine(State):
             exit_event.state_machine = self
             self.root_machine._leaf_state = state
             state._on(exit_event)
-            state.parent.state_stack.push(state)
-            state.parent.state = state.parent.initial_state
-            state = state.parent
+            parent = state.parent
+            assert parent is not None
+            parent.state_stack.push(state)
+            parent.state = parent.initial_state
+            state = parent
         return state
 
     def _enter_states(self, event, top_state, to_state):
@@ -732,7 +741,9 @@ class StateMachine(State):
             enter_event.state_machine = self
             self.root_machine._leaf_state = state
             state._on(enter_event)
-            state.parent.state = state
+            parent = state.parent
+            assert parent is not None
+            parent.state = state
 
     def set_previous_leaf_state(self, event=None):
         '''Transition to a previous leaf state. This makes a dynamic transition
