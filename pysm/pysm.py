@@ -34,8 +34,14 @@ try:
 except ImportError:
     class defaultdict(dict):
         def __init__(self, default_factory=None):
-            super(defaultdict, self).__init__()
+            dict.__init__(self)
             self.default_factory = default_factory
+
+        def __getitem__(self, key):
+            try:
+                return dict.__getitem__(self, key)
+            except KeyError:
+                return self.__missing__(key)
 
         def __missing__(self, key):
             if self.default_factory is None:
