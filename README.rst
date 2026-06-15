@@ -253,6 +253,12 @@ Snapshot And Restore
 Serialization returns plain Python primitives. It does not import ``json`` and
 does not serialize callback code or domain objects.
 
+Snapshots include machine-owned runtime state: the current local ``state`` for
+each state machine, the root ``leaf_state``, each machine's ``state_stack``,
+and the root ``leaf_state_stack``. They intentionally do not include
+``machine.stack``. That stack is user PDA/domain storage and may contain
+arbitrary objects, so persist it separately if your application needs it.
+
 .. code-block:: python
 
    from pysm.serialization import restore, snapshot

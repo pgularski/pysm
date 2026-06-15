@@ -63,6 +63,36 @@ def test_snapshot_restore_restores_history_stack():
     ]
 
 
+def test_snapshot_restore_does_not_serialize_user_pda_stack():
+    machine = StateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    machine.initialize()
+    machine.stack.push({'domain': 'root'})
+    child.stack.push({'domain': 'child'})
+
+    data = snapshot(machine)
+
+    assert 'stack' not in data
+    assert all('stack' not in item for item in data['machines'])
+
+    restored = StateMachine('root')
+    restored_child = StateMachine('child')
+    restored_leaf = State('leaf')
+    restored.add_state(restored_child, initial=True)
+    restored_child.add_state(restored_leaf, initial=True)
+    restored.initialize()
+    restored.stack.push('keep root stack')
+    restored_child.stack.push('keep child stack')
+
+    restore(restored, data)
+
+    assert list(restored.stack.deque) == ['keep root stack']
+    assert list(restored_child.stack.deque) == ['keep child stack']
+
+
 def test_restore_fails_on_topology_mismatch():
     machine = _duplicate_name_machine()
     data = snapshot(machine)
