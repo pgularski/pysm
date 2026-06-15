@@ -40,6 +40,23 @@ def test_async_initialize_rejects_sync_fire_events_on_init():
         machine.initialize(fire_events_on_init=True)
 
 
+def test_async_execution_lock_is_created_lazily():
+    machine = AsyncQueuedStateMachine('m')
+    off = State('off')
+
+    machine.add_state(off, initial=True)
+    machine.initialize()
+
+    assert machine._execution_lock is None
+
+    async def scenario():
+        await machine.dispatch(Event('ignored'))
+
+    asyncio.run(scenario())
+
+    assert machine._execution_lock is not None
+
+
 def test_async_initialize_can_fire_enter_handlers_on_initial_hsm_path():
     async def scenario():
         calls = []

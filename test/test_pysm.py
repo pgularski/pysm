@@ -1730,6 +1730,31 @@ def test_micropython_deque_unbounded_does_not_allocate_maxlen():
         queue.popleft()
 
 
+def test_core_imports_without_logging_module(monkeypatch):
+    import builtins
+    import importlib.util
+    import os
+
+    real_import = builtins.__import__
+
+    def import_without_logging(name, *args, **kwargs):
+        if name == 'logging':
+            raise ImportError('no module named logging')
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', import_without_logging)
+
+    module_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'pysm', 'pysm.py')
+    spec = importlib.util.spec_from_file_location(
+        'pysm_without_logging', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    module.logger.debug('available')
+    module.logger.info('available')
+
+
 def test_leaf_state_from_action_method():
     class TestSM(object):
         def __init__(self):

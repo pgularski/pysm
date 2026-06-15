@@ -26,9 +26,41 @@ Goals:
 .. |Callable| replace:: :class:`~collections.Callable`
 
 '''
-import logging
 import sys
 from collections import defaultdict, deque
+
+try:
+    import logging
+except ImportError:
+    class _NoopLogger(object):
+        def addHandler(self, handler):
+            pass
+
+        def setLevel(self, level):
+            pass
+
+        def debug(self, *args, **kwargs):
+            pass
+
+        def info(self, *args, **kwargs):
+            pass
+
+        def warning(self, *args, **kwargs):
+            pass
+
+        def error(self, *args, **kwargs):
+            pass
+
+    class _LoggingFallback(object):
+        INFO = 20
+
+        def getLogger(self, name):
+            return _NoopLogger()
+
+        def StreamHandler(self, stream=None):
+            return None
+
+    logging = _LoggingFallback()
 
 
 # Required to make it Micropython compatible
