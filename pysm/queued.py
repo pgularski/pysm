@@ -49,7 +49,7 @@ class QueuedStateMachine(StateMachine):
                     next_event = self._external_queue.popleft()
 
                 StateMachine.dispatch(self, next_event)
-        except Exception:
+        except BaseException:
             self._clear_queues()
             raise
         finally:

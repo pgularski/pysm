@@ -211,12 +211,12 @@ For ``asyncio`` applications, use the async queued runtime:
    await machine.dispatch(Event('go'))
 
 ``AsyncQueuedStateMachine`` supports both synchronous and asynchronous
-handlers, conditions, and transition callbacks. It serializes external
-dispatches with ``asyncio.Lock`` and treats events raised from the currently
-running transition task as internal events. Use one event loop per machine.
-If a handler creates a separate task that dispatches into the same machine,
-that dispatch is external and waits until the current run-to-completion cycle
-finishes.
+handlers, conditions, and transition callbacks. Idle dispatches are serialized
+with ``asyncio.Lock``. Events raised from the currently running transition task
+are queued as internal events. If another task dispatches into a machine that
+is already processing, that event is queued as external work and the dispatch
+returns after enqueueing; the active processor drains it after the current
+internal queue is empty. Use one event loop per machine.
 
 
 Snapshot And Restore

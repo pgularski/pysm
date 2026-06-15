@@ -4,6 +4,10 @@ from pysm import Event, State, StateMachine, StateMachineException
 from pysm.queued import QueuedStateMachine, ThreadSafeQueuedStateMachine
 
 
+class SchedulerAbort(BaseException):
+    pass
+
+
 def test_queued_machine_behaves_like_core_for_simple_transition():
     machine = QueuedStateMachine('m')
     off = State('off')
@@ -124,6 +128,64 @@ def test_max_internal_steps_guard():
         assert False, 'Expected StateMachineException'
 
 
+def test_queued_base_exception_clears_queues_and_releases_processor():
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+
+    def aborting_action(state, event):
+        machine.dispatch(Event('stale'))
+        raise SchedulerAbort()
+
+    machine.add_state(a, initial=True)
+    machine.add_transition(a, None, events=['go'], action=aborting_action)
+    machine.add_transition(a, None, events=['stale'],
+                           action=lambda s, e: calls.append('stale'))
+    machine.initialize()
+
+    try:
+        machine.dispatch(Event('go'))
+    except SchedulerAbort:
+        pass
+    else:
+        assert False, 'Expected SchedulerAbort'
+
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+    machine.dispatch(Event('unknown'))
+    assert calls == []
+
+
+def test_queued_runtime_error_clears_pending_internal_events():
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+
+    def aborting_action(state, event):
+        machine.dispatch(Event('stale'))
+        raise RuntimeError('boom')
+
+    machine.add_state(a, initial=True)
+    machine.add_transition(a, None, events=['go'], action=aborting_action)
+    machine.add_transition(a, None, events=['stale'],
+                           action=lambda s, e: calls.append('stale'))
+    machine.initialize()
+
+    try:
+        machine.dispatch(Event('go'))
+    except RuntimeError:
+        pass
+    else:
+        assert False, 'Expected RuntimeError'
+
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+    machine.dispatch(Event('unknown'))
+    assert calls == []
+
+
 def test_thread_safe_queued_machine_serializes_concurrent_dispatches():
     machine = ThreadSafeQueuedStateMachine('m')
     off = State('off')
@@ -174,3 +236,35 @@ def test_thread_safe_nested_machine_uses_root_scheduler_for_internal_event():
 
     assert calls == ['enter_b', 'finish']
     assert machine.leaf_state is b
+
+
+def test_thread_safe_queued_machine_survives_slow_handler_storm():
+    machine = ThreadSafeQueuedStateMachine('m')
+    off = State('off')
+    on = State('on')
+
+    def slow_action(state, event):
+        import time
+        time.sleep(0.001)
+
+    machine.add_state(off, initial=True)
+    machine.add_state(on)
+    machine.add_transition(off, on, events=['toggle'], action=slow_action)
+    machine.add_transition(on, off, events=['toggle'], action=slow_action)
+    machine.initialize()
+
+    threads = [
+        threading.Thread(
+            target=lambda: [machine.dispatch(Event('toggle'))
+                            for _ in range(5)])
+        for _ in range(20)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert machine.state is off
+    assert machine.leaf_state is off
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []

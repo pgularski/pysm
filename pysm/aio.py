@@ -14,9 +14,10 @@ class AsyncQueuedStateMachine(StateMachine):
     '''Async state machine with run-to-completion event scheduling.
 
     The machine is intended to be used from one asyncio event loop. External
-    dispatches are serialized with an ``asyncio.Lock``. Events dispatched from
-    the currently running transition task are queued as internal events and are
-    drained before the next external event.
+    idle dispatches are serialized with an ``asyncio.Lock``. Events dispatched
+    from the currently running transition task are queued as internal events.
+    Events dispatched by other tasks while the machine is already processing
+    are queued as external events and return after enqueueing.
     '''
 
     def __init__(self, name, max_internal_steps=None):
@@ -31,8 +32,11 @@ class AsyncQueuedStateMachine(StateMachine):
     async def dispatch(self, event):
         '''Enqueue and process ``event`` using async RTC semantics.'''
         current_task = asyncio.current_task()
-        if self._is_processing and current_task is self._processing_task:
-            self._internal_queue.append(event)
+        if self._is_processing:
+            if current_task is self._processing_task:
+                self._internal_queue.append(event)
+            else:
+                self._external_queue.append(event)
             return
 
         async with self._execution_lock:
@@ -57,7 +61,7 @@ class AsyncQueuedStateMachine(StateMachine):
                         next_event = self._external_queue.popleft()
 
                     await self._dispatch_one(next_event)
-            except Exception:
+            except BaseException:
                 self._clear_queues()
                 raise
             finally:
