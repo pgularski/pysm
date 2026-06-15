@@ -1568,6 +1568,33 @@ def test_initialize_enter_events_do_not_propagate():
     assert calls == [('parent', 's0'), ('leaf', 's1')]
 
 
+def test_initialize_enter_events_do_not_update_history_stacks():
+    calls = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+
+    def on_enter(state, event):
+        calls.append(state.name)
+
+    for state in (m, s0, s1, s11):
+        state.handlers = {'enter': on_enter}
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s11, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert calls == ['s0', 's1', 's11']
+    assert list(m.state_stack.deque) == []
+    assert list(s0.state_stack.deque) == []
+    assert list(s1.state_stack.deque) == []
+    assert list(m.leaf_state_stack.deque) == []
+
+
 def test_micropython_deque():
     from collections import deque
     from pysm.pysm import patch_deque

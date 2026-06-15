@@ -111,6 +111,68 @@ def test_threadsafe_initialize_dispatch_from_enter_uses_queued_semantics():
     assert machine.leaf_state is done
 
 
+def test_queued_initialize_failure_clears_queues_and_processing_flag():
+    calls = []
+    machine = QueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    done = State('done')
+
+    def enter_child(state, event):
+        calls.append('enter_child')
+        machine.dispatch(Event('finish'))
+        raise SchedulerAbort()
+
+    def finish(state, event):
+        calls.append('finish')
+
+    child.handlers = {'enter': enter_child}
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    child.add_state(done)
+    child.add_transition(leaf, done, events=['finish'], action=finish)
+
+    with pytest.raises(SchedulerAbort):
+        machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['enter_child']
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+    child.handlers = {}
+    machine.initialize()
+    machine.dispatch(Event('finish'))
+
+    assert calls == ['enter_child', 'finish']
+    assert machine.leaf_state is done
+
+
+def test_queued_initialize_enforces_max_internal_steps_guard():
+    calls = []
+    machine = QueuedStateMachine('root', max_internal_steps=2)
+    leaf = State('leaf')
+
+    def enter_leaf(state, event):
+        machine.dispatch(Event('loop'))
+
+    def loop(state, event):
+        calls.append('loop')
+        machine.dispatch(Event('loop'))
+
+    leaf.handlers = {'enter': enter_leaf}
+    machine.add_state(leaf, initial=True)
+    machine.add_transition(leaf, None, events=['loop'], action=loop)
+
+    with pytest.raises(StateMachineException, match='max_internal_steps=2'):
+        machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['loop', 'loop']
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+
 def test_internal_dispatch_from_enter_runs_after_current_transition_finishes():
     calls = []
     machine = QueuedStateMachine('m')

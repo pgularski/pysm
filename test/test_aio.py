@@ -100,6 +100,77 @@ def test_async_initialize_dispatch_from_enter_runs_after_initial_path():
     asyncio.run(scenario())
 
 
+def test_async_initialize_failure_clears_queues_and_processing_state():
+    async def scenario():
+        calls = []
+        machine = AsyncQueuedStateMachine('root')
+        child = StateMachine('child')
+        leaf = State('leaf')
+        done = State('done')
+
+        async def enter_child(state, event):
+            calls.append('enter_child')
+            await machine.dispatch(Event('finish'))
+            raise SchedulerAbort()
+
+        async def finish(state, event):
+            calls.append('finish')
+
+        child.handlers = {'enter': enter_child}
+        machine.add_state(child, initial=True)
+        child.add_state(leaf, initial=True)
+        child.add_state(done)
+        child.add_transition(leaf, done, events=['finish'], action=finish)
+
+        with pytest.raises(SchedulerAbort):
+            await machine.async_initialize(fire_events_on_init=True)
+
+        assert calls == ['enter_child']
+        assert machine._is_processing is False
+        assert machine._processing_task is None
+        assert list(machine._internal_queue) == []
+        assert list(machine._external_queue) == []
+
+        child.handlers = {}
+        await machine.async_initialize()
+        await machine.dispatch(Event('finish'))
+
+        assert calls == ['enter_child', 'finish']
+        assert machine.leaf_state is done
+
+    asyncio.run(scenario())
+
+
+def test_async_initialize_enforces_max_internal_steps_guard():
+    async def scenario():
+        calls = []
+        machine = AsyncQueuedStateMachine('root', max_internal_steps=2)
+        leaf = State('leaf')
+
+        async def enter_leaf(state, event):
+            await machine.dispatch(Event('loop'))
+
+        async def loop(state, event):
+            calls.append('loop')
+            await machine.dispatch(Event('loop'))
+
+        leaf.handlers = {'enter': enter_leaf}
+        machine.add_state(leaf, initial=True)
+        machine.add_transition(leaf, None, events=['loop'], action=loop)
+
+        with pytest.raises(StateMachineException,
+                           match='max_internal_steps=2'):
+            await machine.async_initialize(fire_events_on_init=True)
+
+        assert calls == ['loop', 'loop']
+        assert machine._is_processing is False
+        assert machine._processing_task is None
+        assert list(machine._internal_queue) == []
+        assert list(machine._external_queue) == []
+
+    asyncio.run(scenario())
+
+
 def test_async_internal_dispatch_from_enter_runs_after_transition_finishes():
     async def scenario():
         calls = []
