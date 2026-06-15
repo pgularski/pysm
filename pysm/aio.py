@@ -39,9 +39,40 @@ class AsyncQueuedStateMachine(StateMachine):
 
     async def async_initialize(self, fire_events_on_init=False):
         '''Initialize and optionally await entry handlers on the initial path.'''
-        StateMachine.initialize(self, fire_events_on_init=False)
-        if fire_events_on_init:
-            await self._enter_initial_states()
+        async with self._execution_lock:
+            StateMachine.initialize(self, fire_events_on_init=False)
+            if not fire_events_on_init:
+                return
+
+            self._is_processing = True
+            self._processing_task = asyncio.current_task()
+            try:
+                await self._enter_initial_states()
+                await self._process_queues()
+            except BaseException:
+                self._clear_queues()
+                raise
+            finally:
+                self._is_processing = False
+                self._processing_task = None
+
+    async def _process_queues(self):
+        internal_steps = 0
+        while self._internal_queue or self._external_queue:
+            if self._internal_queue:
+                internal_steps += 1
+                if (self.max_internal_steps is not None and
+                        internal_steps > self.max_internal_steps):
+                    raise StateMachineException(
+                        'AsyncQueuedStateMachine "{0}" exceeded '
+                        'max_internal_steps={1}'.format(
+                            self.name, self.max_internal_steps))
+                next_event = self._internal_queue.popleft()
+            else:
+                internal_steps = 0
+                next_event = self._external_queue.popleft()
+
+            await self._dispatch_one(next_event)
 
     async def dispatch(self, event):
         '''Enqueue and process ``event`` using async RTC semantics.'''
@@ -57,24 +88,9 @@ class AsyncQueuedStateMachine(StateMachine):
             self._external_queue.append(event)
             self._is_processing = True
             self._processing_task = current_task
-            internal_steps = 0
 
             try:
-                while self._internal_queue or self._external_queue:
-                    if self._internal_queue:
-                        internal_steps += 1
-                        if (self.max_internal_steps is not None and
-                                internal_steps > self.max_internal_steps):
-                            raise StateMachineException(
-                                'AsyncQueuedStateMachine "{0}" exceeded '
-                                'max_internal_steps={1}'.format(
-                                    self.name, self.max_internal_steps))
-                        next_event = self._internal_queue.popleft()
-                    else:
-                        internal_steps = 0
-                        next_event = self._external_queue.popleft()
-
-                    await self._dispatch_one(next_event)
+                await self._process_queues()
             except BaseException:
                 self._clear_queues()
                 raise

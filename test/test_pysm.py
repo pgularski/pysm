@@ -1498,6 +1498,50 @@ def test_initialize_can_fire_enter_handlers_on_initial_hsm_path():
     ]
 
 
+def test_initialize_enters_only_active_path_in_complex_hsm():
+    calls = []
+    snapshots = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+    s2 = StateMachine('s2')
+    s21 = StateMachine('s21')
+    s211 = State('s211')
+
+    def on_enter(state, event):
+        assert m.leaf_state is state
+        calls.append(state.name)
+        snapshots.append((
+            m.state.name,
+            s0.state.name,
+            s1.state.name,
+            s2.state.name,
+            s21.state.name,
+        ))
+
+    for state in (m, s0, s1, s11, s2, s21, s211):
+        state.handlers = {'enter': on_enter}
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s0.add_state(s2)
+    s1.add_state(s11, initial=True)
+    s2.add_state(s21, initial=True)
+    s21.add_state(s211, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert m.leaf_state is s11
+    assert calls == ['s0', 's1', 's11']
+    assert snapshots == [
+        ('s0', 's1', 's11', 's21', 's211'),
+        ('s0', 's1', 's11', 's21', 's211'),
+        ('s0', 's1', 's11', 's21', 's211'),
+    ]
+
+
 def test_initialize_enter_events_do_not_propagate():
     calls = []
 

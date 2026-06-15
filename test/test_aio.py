@@ -66,6 +66,40 @@ def test_async_initialize_can_fire_enter_handlers_on_initial_hsm_path():
     asyncio.run(scenario())
 
 
+def test_async_initialize_dispatch_from_enter_runs_after_initial_path():
+    async def scenario():
+        calls = []
+        machine = AsyncQueuedStateMachine('root')
+        child = StateMachine('child')
+        leaf = State('leaf')
+        done = State('done')
+
+        async def enter_child(state, event):
+            calls.append('enter_child')
+            await machine.dispatch(Event('finish'))
+
+        async def enter_leaf(state, event):
+            calls.append('enter_leaf')
+
+        async def finish(state, event):
+            calls.append('finish')
+
+        child.handlers = {'enter': enter_child}
+        leaf.handlers = {'enter': enter_leaf}
+
+        machine.add_state(child, initial=True)
+        child.add_state(leaf, initial=True)
+        child.add_state(done)
+        child.add_transition(leaf, done, events=['finish'], action=finish)
+
+        await machine.async_initialize(fire_events_on_init=True)
+
+        assert calls == ['enter_child', 'enter_leaf', 'finish']
+        assert machine.leaf_state is done
+
+    asyncio.run(scenario())
+
+
 def test_async_internal_dispatch_from_enter_runs_after_transition_finishes():
     async def scenario():
         calls = []

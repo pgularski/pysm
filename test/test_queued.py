@@ -49,6 +49,68 @@ def test_queued_initialize_can_fire_enter_handlers_on_initial_hsm_path():
     assert calls == [('child', machine, None), ('leaf', machine, None)]
 
 
+def test_queued_initialize_dispatch_from_enter_runs_after_initial_path():
+    calls = []
+    machine = QueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    done = State('done')
+
+    def enter_child(state, event):
+        calls.append('enter_child')
+        machine.dispatch(Event('finish'))
+
+    def enter_leaf(state, event):
+        calls.append('enter_leaf')
+
+    def finish(state, event):
+        calls.append('finish')
+
+    child.handlers = {'enter': enter_child}
+    leaf.handlers = {'enter': enter_leaf}
+
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    child.add_state(done)
+    child.add_transition(leaf, done, events=['finish'], action=finish)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['enter_child', 'enter_leaf', 'finish']
+    assert machine.leaf_state is done
+
+
+def test_threadsafe_initialize_dispatch_from_enter_uses_queued_semantics():
+    calls = []
+    machine = ThreadSafeQueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    done = State('done')
+
+    def enter_child(state, event):
+        calls.append('enter_child')
+        machine.dispatch(Event('finish'))
+
+    def enter_leaf(state, event):
+        calls.append('enter_leaf')
+
+    def finish(state, event):
+        calls.append('finish')
+
+    child.handlers = {'enter': enter_child}
+    leaf.handlers = {'enter': enter_leaf}
+
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    child.add_state(done)
+    child.add_transition(leaf, done, events=['finish'], action=finish)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['enter_child', 'enter_leaf', 'finish']
+    assert machine.leaf_state is done
+
+
 def test_internal_dispatch_from_enter_runs_after_current_transition_finishes():
     calls = []
     machine = QueuedStateMachine('m')

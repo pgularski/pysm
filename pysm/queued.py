@@ -24,6 +24,21 @@ class QueuedStateMachine(StateMachine):
         self._external_queue = deque()
         self._is_processing = False
 
+    def initialize(self, fire_events_on_init=False):
+        StateMachine.initialize(self, fire_events_on_init=False)
+        if not fire_events_on_init:
+            return
+
+        self._is_processing = True
+        try:
+            self._enter_initial_states()
+            self._process_queues()
+        except BaseException:
+            self._clear_queues()
+            raise
+        finally:
+            self._is_processing = False
+
     def dispatch(self, event):
         '''Enqueue ``event`` and process pending work to completion.'''
         if self._is_processing:
@@ -32,29 +47,32 @@ class QueuedStateMachine(StateMachine):
 
         self._external_queue.append(event)
         self._is_processing = True
-        internal_steps = 0
 
         try:
-            while self._internal_queue or self._external_queue:
-                if self._internal_queue:
-                    internal_steps += 1
-                    if (self.max_internal_steps is not None and
-                            internal_steps > self.max_internal_steps):
-                        raise StateMachineException(
-                            'QueuedStateMachine "{0}" exceeded '
-                            'max_internal_steps={1}'.format(
-                                self.name, self.max_internal_steps))
-                    next_event = self._internal_queue.popleft()
-                else:
-                    internal_steps = 0
-                    next_event = self._external_queue.popleft()
-
-                StateMachine.dispatch(self, next_event)
+            self._process_queues()
         except BaseException:
             self._clear_queues()
             raise
         finally:
             self._is_processing = False
+
+    def _process_queues(self):
+        internal_steps = 0
+        while self._internal_queue or self._external_queue:
+            if self._internal_queue:
+                internal_steps += 1
+                if (self.max_internal_steps is not None and
+                        internal_steps > self.max_internal_steps):
+                    raise StateMachineException(
+                        'QueuedStateMachine "{0}" exceeded '
+                        'max_internal_steps={1}'.format(
+                            self.name, self.max_internal_steps))
+                next_event = self._internal_queue.popleft()
+            else:
+                internal_steps = 0
+                next_event = self._external_queue.popleft()
+
+            StateMachine.dispatch(self, next_event)
 
     def _clear_queues(self):
         while self._internal_queue:
@@ -80,3 +98,8 @@ class ThreadSafeQueuedStateMachine(QueuedStateMachine):
     def dispatch(self, event):
         with self._execution_lock:
             return QueuedStateMachine.dispatch(self, event)
+
+    def initialize(self, fire_events_on_init=False):
+        with self._execution_lock:
+            return QueuedStateMachine.initialize(
+                self, fire_events_on_init=fire_events_on_init)
