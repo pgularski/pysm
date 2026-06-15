@@ -32,15 +32,19 @@ from collections import deque
 try:
     from collections import defaultdict
 except ImportError:
-    class defaultdict(dict):
+    class defaultdict(object):
         def __init__(self, default_factory=None):
             self.default_factory = default_factory
+            self._data = {}
 
         def __getitem__(self, key):
             try:
-                return dict.__getitem__(self, key)
+                return self._data[key]
             except KeyError:
                 return self.__missing__(key)
+
+        def __setitem__(self, key, value):
+            self._data[key] = value
 
         def __missing__(self, key):
             if self.default_factory is None:
