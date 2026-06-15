@@ -31,5 +31,6 @@ Advanced behavior is opt-in:
    :maxdepth: 2
 
    pysm_module
+   optional_modules
    installing
    examples
