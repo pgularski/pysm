@@ -55,6 +55,7 @@ def restore(machine, data):
         raise StateMachineException('Snapshot root does not match machine root')
 
     _validate_topology(root, data)
+    _validate_active_state_paths(root, data)
 
     for machine_data in data.get('machines', []):
         item = _resolve_machine_path(root, machine_data['path'])
@@ -152,6 +153,53 @@ def _validate_topology(root, data):
         raise StateMachineException('Snapshot machines do not match machine')
 
     _validate_unique_sibling_names(root)
+
+
+def _validate_active_state_paths(root, data):
+    machines = {}
+    for machine_data in data.get('machines', []):
+        path = tuple(machine_data['path'])
+        machine = _resolve_machine_path(root, machine_data['path'])
+        machines[path] = machine_data
+
+        state_path = machine_data.get('state')
+        if state_path is not None:
+            state = _resolve_state_path(root, state_path)
+            if state.parent is not machine:
+                raise StateMachineException(
+                    'Snapshot state is not a child of machine: {0}'.format(
+                        state_path))
+
+        for stack_path in machine_data.get('state_stack', []):
+            state = _resolve_state_path(root, stack_path)
+            if state.parent is not machine:
+                raise StateMachineException(
+                    'Snapshot stack state is not a child of machine: {0}'
+                    .format(stack_path))
+
+    expected_leaf = _expected_leaf_path_from_machine_states(
+        tuple(data['root']), machines)
+    actual_leaf = data.get('leaf_state')
+    if ((actual_leaf is None and expected_leaf is not None) or
+            (actual_leaf is not None and tuple(actual_leaf) != expected_leaf)):
+        raise StateMachineException(
+            'Snapshot leaf state does not match active machine states')
+
+
+def _expected_leaf_path_from_machine_states(root_path, machines):
+    machine_data = machines[root_path]
+    state_path = machine_data.get('state')
+    if state_path is None:
+        return None
+
+    leaf_path = tuple(state_path)
+    while leaf_path in machines:
+        child_data = machines[leaf_path]
+        child_state_path = child_data.get('state')
+        if child_state_path is None:
+            break
+        leaf_path = tuple(child_state_path)
+    return leaf_path
 
 
 def _validate_unique_sibling_names(root):

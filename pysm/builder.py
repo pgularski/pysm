@@ -33,6 +33,9 @@ class StateMachineBuilder(object):
                    condition=None, before=None, after=None):
         from_state = self._resolve_state(from_path)
         to_state = None if to_path is None else self._resolve_state(to_path)
+        events = self._normalize_values(events)
+        if input is not None:
+            input = self._normalize_values(input)
         machine = from_state.parent
         if machine is None:
             raise StateMachineException(
@@ -94,3 +97,8 @@ class StateMachineBuilder(object):
                 return tuple(part for part in path.split('/') if part)
             return (path,)
         raise StateMachineException('Unsupported state path: {0}'.format(path))
+
+    def _normalize_values(self, values):
+        if isinstance(values, str):
+            return [values]
+        return values

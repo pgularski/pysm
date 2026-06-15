@@ -74,3 +74,70 @@ def test_restore_fails_on_topology_mismatch():
 
     with pytest.raises(StateMachineException):
         restore(changed, data)
+
+
+def test_snapshot_fails_on_duplicate_sibling_names():
+    machine = StateMachine('root')
+    first = State('duplicate')
+    second = State('duplicate')
+    machine.add_state(first, initial=True)
+    machine.add_state(second)
+    machine.initialize()
+
+    with pytest.raises(StateMachineException, match='Ambiguous sibling'):
+        snapshot(machine)
+
+
+def test_restore_fails_when_machine_state_is_not_a_direct_child():
+    machine = StateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    outsider = State('outsider')
+    machine.add_state(child, initial=True)
+    machine.add_state(outsider)
+    child.add_state(leaf, initial=True)
+    machine.initialize()
+
+    data = snapshot(machine)
+    for item in data['machines']:
+        if item['path'] == ['root', 'child']:
+            item['state'] = ['root', 'outsider']
+            break
+
+    restored = StateMachine('root')
+    restored_child = StateMachine('child')
+    restored_leaf = State('leaf')
+    restored_outsider = State('outsider')
+    restored.add_state(restored_child, initial=True)
+    restored.add_state(restored_outsider)
+    restored_child.add_state(restored_leaf, initial=True)
+    restored.initialize()
+
+    with pytest.raises(StateMachineException, match='not a child'):
+        restore(restored, data)
+
+
+def test_restore_fails_when_leaf_state_contradicts_machine_states():
+    machine = StateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    outsider = State('outsider')
+    machine.add_state(child, initial=True)
+    machine.add_state(outsider)
+    child.add_state(leaf, initial=True)
+    machine.initialize()
+
+    data = snapshot(machine)
+    data['leaf_state'] = ['root', 'outsider']
+
+    restored = StateMachine('root')
+    restored_child = StateMachine('child')
+    restored_leaf = State('leaf')
+    restored_outsider = State('outsider')
+    restored.add_state(restored_child, initial=True)
+    restored.add_state(restored_outsider)
+    restored_child.add_state(restored_leaf, initial=True)
+    restored.initialize()
+
+    with pytest.raises(StateMachineException, match='leaf state'):
+        restore(restored, data)

@@ -194,6 +194,36 @@ def test_conditions():
     assert sm.state == idling
 
 
+def test_condition_must_return_literal_true_not_truthy_value():
+    calls = []
+    idling = State('idling')
+    truthy = State('truthy')
+    literal = State('literal')
+
+    def truthy_condition(state, event):
+        calls.append('truthy')
+        return 1
+
+    def literal_true_condition(state, event):
+        calls.append('literal')
+        return True
+
+    sm = StateMachine('sm')
+    sm.add_state(idling, initial=True)
+    sm.add_state(truthy)
+    sm.add_state(literal)
+    sm.add_transition(idling, truthy, events=['run'],
+                      condition=truthy_condition)
+    sm.add_transition(idling, literal, events=['run'],
+                      condition=literal_true_condition)
+    sm.initialize()
+
+    sm.dispatch(_e('run'))
+
+    assert calls == ['truthy', 'literal']
+    assert sm.state is literal
+
+
 def test_internal_transition():
     class Foo(object):
         def __init__(self):

@@ -42,3 +42,32 @@ def test_builder_rejects_ambiguous_short_paths():
 
     with pytest.raises(StateMachineException):
         builder.transition('leaf', 'right/leaf', events=['go'])
+
+
+def test_builder_treats_string_events_as_single_event_name():
+    machine = (StateMachineBuilder('toggle')
+               .state('off', initial=True)
+               .state('on')
+               .transition('off', 'on', events='turn_on')
+               .build())
+
+    machine.dispatch(Event('t'))
+    assert machine.leaf_state.name == 'off'
+
+    machine.dispatch(Event('turn_on'))
+    assert machine.leaf_state.name == 'on'
+
+
+def test_builder_treats_string_input_as_single_input_value():
+    machine = (StateMachineBuilder('parser')
+               .state('waiting', initial=True)
+               .state('matched')
+               .transition('waiting', 'matched', events=['parse'],
+                           input='expected')
+               .build())
+
+    machine.dispatch(Event('parse', input='e'))
+    assert machine.leaf_state.name == 'waiting'
+
+    machine.dispatch(Event('parse', input='expected'))
+    assert machine.leaf_state.name == 'matched'

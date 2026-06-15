@@ -1,5 +1,7 @@
 import threading
 
+import pytest
+
 from pysm import Event, State, StateMachine, StateMachineException
 from pysm.queued import QueuedStateMachine, ThreadSafeQueuedStateMachine
 
@@ -126,6 +128,114 @@ def test_max_internal_steps_guard():
         assert 'max_internal_steps=2' in str(exc)
     else:
         assert False, 'Expected StateMachineException'
+
+
+def test_internal_events_from_every_phase_keep_source_order():
+    phases = ['handler', 'condition', 'before', 'exit', 'action',
+              'enter', 'after']
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+
+    def mark(phase):
+        machine.dispatch(Event('mark', input=phase))
+
+    def handler(state, event):
+        mark('handler')
+
+    def condition(state, event):
+        mark('condition')
+        return True
+
+    def before(state, event):
+        mark('before')
+
+    def exit_a(state, event):
+        mark('exit')
+
+    def action(state, event):
+        mark('action')
+
+    def enter_b(state, event):
+        mark('enter')
+
+    def after(state, event):
+        mark('after')
+
+    def record(state, event):
+        calls.append(event.input)
+
+    a.handlers = {'go': handler, 'exit': exit_a}
+    b.handlers = {'enter': enter_b}
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_transition(a, b, events=['go'], condition=condition,
+                           before=before, action=action, after=after)
+    machine.add_transition(b, None, events=['mark'], input=phases,
+                           action=record)
+    machine.initialize()
+
+    machine.dispatch(Event('go'))
+
+    assert calls == phases
+
+
+@pytest.mark.parametrize('phase', [
+    'handler',
+    'condition',
+    'before',
+    'exit',
+    'action',
+    'enter',
+    'after',
+])
+def test_queued_callback_failure_clears_queued_work_from_each_phase(phase):
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+
+    def fail(state, event):
+        machine.dispatch(Event('stale'))
+        raise RuntimeError(phase)
+
+    def condition(state, event):
+        if phase == 'condition':
+            fail(state, event)
+        return True
+
+    def record_stale(state, event):
+        calls.append('stale')
+
+    a.handlers = {'stale': record_stale}
+    b.handlers = {'stale': record_stale}
+    if phase == 'handler':
+        a.handlers['go'] = fail
+    if phase == 'exit':
+        a.handlers['exit'] = fail
+    if phase == 'enter':
+        b.handlers['enter'] = fail
+
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_transition(
+        a, b, events=['go'],
+        condition=condition,
+        before=fail if phase == 'before' else None,
+        action=fail if phase == 'action' else None,
+        after=fail if phase == 'after' else None)
+    machine.initialize()
+
+    with pytest.raises(RuntimeError, match=phase):
+        machine.dispatch(Event('go'))
+
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+    machine.dispatch(Event('unknown'))
+    assert calls == []
 
 
 def test_queued_base_exception_clears_queues_and_releases_processor():
@@ -268,3 +378,45 @@ def test_thread_safe_queued_machine_survives_slow_handler_storm():
     assert machine.leaf_state is off
     assert list(machine._internal_queue) == []
     assert list(machine._external_queue) == []
+
+
+def test_thread_safe_queued_machine_never_runs_two_handlers_at_once():
+    active_handlers = [0]
+    max_active_handlers = [0]
+    guard = threading.Lock()
+    machine = ThreadSafeQueuedStateMachine('m')
+    off = State('off')
+    on = State('on')
+
+    def slow_action(state, event):
+        import time
+        with guard:
+            active_handlers[0] += 1
+            max_active_handlers[0] = max(
+                max_active_handlers[0], active_handlers[0])
+        time.sleep(0.001)
+        with guard:
+            active_handlers[0] -= 1
+
+    machine.add_state(off, initial=True)
+    machine.add_state(on)
+    machine.add_transition(off, on, events=['toggle'], action=slow_action)
+    machine.add_transition(on, off, events=['toggle'], action=slow_action)
+    machine.initialize()
+
+    start = threading.Barrier(11)
+
+    def toggle_many():
+        start.wait()
+        for _ in range(5):
+            machine.dispatch(Event('toggle'))
+
+    threads = [threading.Thread(target=toggle_many) for _ in range(10)]
+    for thread in threads:
+        thread.start()
+    start.wait()
+    for thread in threads:
+        thread.join()
+
+    assert max_active_handlers[0] == 1
+    assert active_handlers[0] == 0
