@@ -46,9 +46,9 @@ class StateMachineBuilder(object):
             condition=condition, before=before, after=after)
         return self
 
-    def build(self, initialize=True):
+    def build(self, initialize=True, fire_events_on_init=False):
         if initialize:
-            self.root.initialize()
+            self.root.initialize(fire_events_on_init=fire_events_on_init)
         return self.root
 
     def _resolve_machine(self, path):

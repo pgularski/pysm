@@ -1,6 +1,6 @@
 import pytest
 
-from pysm import Event, StateMachineException
+from pysm import Event, State, StateMachineException
 from pysm.builder import StateMachineBuilder
 
 
@@ -71,3 +71,20 @@ def test_builder_treats_string_input_as_single_input_value():
 
     machine.dispatch(Event('parse', input='expected'))
     assert machine.leaf_state.name == 'matched'
+
+
+def test_builder_can_fire_enter_events_when_initializing():
+    calls = []
+
+    def on_enter(state, event):
+        calls.append((state.name, event.state_machine.name))
+
+    class EnteringState(State):
+        def register_handlers(self):
+            self.handlers = {'enter': on_enter}
+
+    machine = (StateMachineBuilder('root', state_class=EnteringState)
+               .state('ready', initial=True)
+               .build(fire_events_on_init=True))
+
+    assert calls == [('ready', 'root')]

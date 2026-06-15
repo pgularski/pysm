@@ -1432,9 +1432,96 @@ def test_transition_on_any_event():
     assert m.leaf_state == s0
 
 
-def enter_on_initialize():
-    # TODO: Do I want this behaviour? It's not implemented atm.
-    pass
+def test_initialize_does_not_fire_enter_handlers_by_default():
+    calls = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = State('s1')
+
+    for state in (m, s0, s1):
+        state.handlers = {
+            'enter': lambda state, event: calls.append(state.name),
+        }
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+
+    m.initialize()
+
+    assert m.leaf_state is s1
+    assert calls == []
+
+
+def test_initialize_can_fire_enter_handlers_on_initial_hsm_path():
+    calls = []
+    event_details = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+    s2 = State('s2')
+
+    def on_enter(state, event):
+        assert m.leaf_state is state
+        calls.append(state.name)
+        event_details.append((
+            event.name,
+            event.state_machine,
+            event.propagate,
+            event.cargo.get('source_event', 'missing'),
+        ))
+
+    def on_exit(state, event):
+        pytest.fail('initialize must not fire exit handlers')
+
+    for state in (m, s0, s1, s11, s2):
+        state.handlers = {'enter': on_enter, 'exit': on_exit}
+
+    m.add_state(s0, initial=True)
+    m.add_state(s2)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s11, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert m.state is s0
+    assert s0.state is s1
+    assert s1.state is s11
+    assert m.leaf_state is s11
+    assert calls == ['s0', 's1', 's11']
+    assert event_details == [
+        ('enter', m, False, None),
+        ('enter', m, False, None),
+        ('enter', m, False, None),
+    ]
+
+
+def test_initialize_enter_events_do_not_propagate():
+    calls = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = State('s1')
+
+    def on_parent_enter(state, event):
+        calls.append(('parent', state.name))
+
+    def on_leaf_enter(state, event):
+        calls.append(('leaf', state.name))
+        event.propagate = True
+
+    m.handlers = {'enter': on_parent_enter}
+    s0.handlers = {'enter': on_parent_enter}
+    s1.handlers = {'enter': on_leaf_enter}
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert calls == [('parent', 's0'), ('leaf', 's1')]
 
 
 def test_micropython_deque():

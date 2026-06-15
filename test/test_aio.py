@@ -30,6 +30,42 @@ def test_async_machine_behaves_like_core_for_simple_transition():
     asyncio.run(scenario())
 
 
+def test_async_initialize_rejects_sync_fire_events_on_init():
+    machine = AsyncQueuedStateMachine('m')
+    initial = State('initial')
+
+    machine.add_state(initial, initial=True)
+
+    with pytest.raises(StateMachineException, match='async_initialize'):
+        machine.initialize(fire_events_on_init=True)
+
+
+def test_async_initialize_can_fire_enter_handlers_on_initial_hsm_path():
+    async def scenario():
+        calls = []
+        machine = AsyncQueuedStateMachine('root')
+        child = StateMachine('child')
+        leaf = State('leaf')
+
+        async def enter(state, event):
+            assert machine.leaf_state is state
+            calls.append((state.name, event.state_machine, event.cargo[
+                'source_event']))
+
+        child.handlers = {'enter': enter}
+        leaf.handlers = {'enter': enter}
+
+        machine.add_state(child, initial=True)
+        child.add_state(leaf, initial=True)
+
+        await machine.async_initialize(fire_events_on_init=True)
+
+        assert machine.leaf_state is leaf
+        assert calls == [('child', machine, None), ('leaf', machine, None)]
+
+    asyncio.run(scenario())
+
+
 def test_async_internal_dispatch_from_enter_runs_after_transition_finishes():
     async def scenario():
         calls = []

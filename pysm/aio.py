@@ -30,6 +30,19 @@ class AsyncQueuedStateMachine(StateMachine):
         self._processing_task = None
         self._execution_lock = asyncio.Lock()
 
+    def initialize(self, fire_events_on_init=False):
+        if fire_events_on_init:
+            raise StateMachineException(
+                'Use async_initialize(fire_events_on_init=True) for '
+                'AsyncQueuedStateMachine enter handlers')
+        StateMachine.initialize(self, fire_events_on_init=False)
+
+    async def async_initialize(self, fire_events_on_init=False):
+        '''Initialize and optionally await entry handlers on the initial path.'''
+        StateMachine.initialize(self, fire_events_on_init=False)
+        if fire_events_on_init:
+            await self._enter_initial_states()
+
     async def dispatch(self, event):
         '''Enqueue and process ``event`` using async RTC semantics.'''
         current_task = asyncio.current_task()
@@ -92,6 +105,14 @@ class AsyncQueuedStateMachine(StateMachine):
         if (state.parent and event.propagate and
                 event.name not in ('exit', 'enter')):
             await self._on(state.parent, event)
+
+    async def _enter_initial_states(self):
+        for state in self._initial_entry_path():
+            logger.debug('entering %s', state.name)
+            enter_event = Event('enter', propagate=False, source_event=None)
+            enter_event.state_machine = self
+            self.root_machine._leaf_state = state
+            await self._on(state, enter_event)
 
     async def _get_transition(self, event):
         machine = self.leaf_state.parent

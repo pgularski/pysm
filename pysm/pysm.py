@@ -656,7 +656,7 @@ class StateMachine(State):
             state = state.state
         return state
 
-    def initialize(self):
+    def initialize(self, fire_events_on_init=False):
         '''Initialize states in the state machine.
 
         After a state machine has been created and all states are added to it,
@@ -678,6 +678,26 @@ class StateMachine(State):
                     machines.append(child_state)
 
         self._leaf_state = self._get_leaf_state(self)
+        if fire_events_on_init:
+            self._enter_initial_states()
+
+    def _initial_entry_path(self):
+        path = []
+        state = self.state
+        while state is not None:
+            path.append(state)
+            if not isinstance(state, StateMachine):
+                break
+            state = state.state
+        return path
+
+    def _enter_initial_states(self):
+        for state in self._initial_entry_path():
+            logger.debug('entering %s', state.name)
+            enter_event = Event('enter', propagate=False, source_event=None)
+            enter_event.state_machine = self
+            self.root_machine._leaf_state = state
+            state._on(enter_event)
 
     def dispatch(self, event):
         '''Dispatch an event to a state machine.

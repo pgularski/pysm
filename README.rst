@@ -123,6 +123,31 @@ Nested HSM
    assert oven.leaf_state is baking
 
 
+Initial Entry Events
+--------------------
+
+By default, ``initialize()`` preserves the historical behavior and only selects
+the active initial path. If you want initial states to receive ``enter`` events,
+opt in explicitly:
+
+.. code-block:: python
+
+   from pysm import State, StateMachine
+
+   calls = []
+   ready = State('ready')
+   ready.handlers = {'enter': lambda state, event: calls.append(state.name)}
+
+   machine = StateMachine('m')
+   machine.add_state(ready, initial=True)
+   machine.initialize(fire_events_on_init=True)
+
+   assert calls == ['ready']
+
+For hierarchical machines, ``enter`` handlers fire from the root's initial
+child down to the active leaf state. The root machine itself is not entered.
+
+
 Queued Run-To-Completion Dispatch
 ---------------------------------
 
@@ -217,6 +242,9 @@ are queued as internal events. If another task dispatches into a machine that
 is already processing, that event is queued as external work and the dispatch
 returns after enqueueing; the active processor drains it after the current
 internal queue is empty. Use one event loop per machine.
+
+Use ``await machine.async_initialize(fire_events_on_init=True)`` if initial
+``enter`` handlers need to be awaited.
 
 
 Snapshot And Restore

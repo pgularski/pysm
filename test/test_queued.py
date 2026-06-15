@@ -26,6 +26,29 @@ def test_queued_machine_behaves_like_core_for_simple_transition():
     assert machine.leaf_state is on
 
 
+def test_queued_initialize_can_fire_enter_handlers_on_initial_hsm_path():
+    calls = []
+    machine = QueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+
+    def enter(state, event):
+        assert machine.leaf_state is state
+        calls.append((state.name, event.state_machine, event.cargo[
+            'source_event']))
+
+    child.handlers = {'enter': enter}
+    leaf.handlers = {'enter': enter}
+
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert machine.leaf_state is leaf
+    assert calls == [('child', machine, None), ('leaf', machine, None)]
+
+
 def test_internal_dispatch_from_enter_runs_after_current_transition_finishes():
     calls = []
     machine = QueuedStateMachine('m')
