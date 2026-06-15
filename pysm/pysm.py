@@ -45,12 +45,21 @@ def patch_deque(deque_module):
             if iterable is None:
                 iterable = []
             if maxlen in [None, 0]:
-                maxlen = getattr(sys, 'maxsize', 2 ** 31 - 1)
-            self.q = deque_module.deque(iterable, maxlen)
+                self.q = list(iterable)
+                maxlen = 0
+            else:
+                self.q = deque_module.deque(iterable, maxlen)
             self.maxlen = maxlen
 
         def pop(self):
             return self.q.pop()
+
+        def popleft(self):
+            if hasattr(self.q, 'popleft'):
+                return self.q.popleft()
+            if not self.q:
+                raise IndexError('pop from an empty deque')
+            return self.q.pop(0)
 
         def append(self, item):
             if self.maxlen > 0 and len(self.q) >= self.maxlen:
@@ -70,7 +79,10 @@ def patch_deque(deque_module):
             return iter(self.q)
 
         def __getitem__(self, key):
-            return self.q[key]
+            try:
+                return self.q[key]
+            except IndexError:
+                raise IndexError('deque index out of range')
 
     return deque_maxlen
 

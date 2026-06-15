@@ -1706,6 +1706,29 @@ def test_micropython_deque_maxlen_exceeded():
         deque = old_deque
 
 
+def test_micropython_deque_unbounded_does_not_allocate_maxlen():
+    from pysm.pysm import patch_deque
+
+    class StrictMicropythonDeque(object):
+        def __init__(self, iterable, maxlen):
+            raise AssertionError(
+                'unbounded deque should not allocate maxlen={0}'.format(
+                    maxlen))
+
+    class StrictMicropythonDequeModule(object):
+        deque = StrictMicropythonDeque
+
+    deque = patch_deque(StrictMicropythonDequeModule)
+    queue = deque()
+    queue.append(1)
+    queue.append(2)
+
+    assert queue.popleft() == 1
+    assert queue.popleft() == 2
+
+    with pytest.raises(IndexError):
+        queue.popleft()
+
 
 def test_leaf_state_from_action_method():
     class TestSM(object):
