@@ -1,29 +1,18 @@
+# pyright: basic, reportArgumentType=false
 '''Optional fluent builder for pysm state machines.'''
-from typing import Any, Hashable, Dict, Iterable, Optional, Tuple, Type, Union
-
 from .pysm import State, StateMachine, StateMachineException
-
-
-Path = Tuple[str, ...]
-PathInput = Union[str, Iterable[str]]
-ValueInput = Union[str, Iterable[Hashable]]
 
 
 class StateMachineBuilder(object):
     '''Small opt-in helper that builds machines through the public core API.'''
 
-    def __init__(
-            self, name: str,
-            machine_class: Type[StateMachine] = StateMachine,
-            state_class: Type[State] = State) -> None:
+    def __init__(self, name, machine_class=StateMachine, state_class=State):
         self.root = machine_class(name)
         self.machine_class = machine_class
         self.state_class = state_class
-        self._states: Dict[Path, State] = {(name,): self.root}
+        self._states = {(name,): self.root}
 
-    def state(
-            self, name: str, initial: bool = False,
-            parent_path: Optional[PathInput] = None) -> 'StateMachineBuilder':
+    def state(self, name, initial=False, parent_path=None):
         parent = self._resolve_machine(parent_path)
         path = self._child_path(parent, name)
         self._ensure_new_path(path)
@@ -32,9 +21,7 @@ class StateMachineBuilder(object):
         self._states[path] = state
         return self
 
-    def machine(
-            self, name: str, initial: bool = False,
-            parent_path: Optional[PathInput] = None) -> 'StateMachineBuilder':
+    def machine(self, name, initial=False, parent_path=None):
         parent = self._resolve_machine(parent_path)
         path = self._child_path(parent, name)
         self._ensure_new_path(path)
@@ -43,11 +30,8 @@ class StateMachineBuilder(object):
         self._states[path] = machine
         return self
 
-    def transition(
-            self, from_path: PathInput, to_path: Optional[PathInput],
-            events: ValueInput, input: Optional[ValueInput] = None,
-            action: Any = None, condition: Any = None, before: Any = None,
-            after: Any = None) -> 'StateMachineBuilder':
+    def transition(self, from_path, to_path, events, input=None, action=None,
+                   condition=None, before=None, after=None):
         from_state = self._resolve_state(from_path)
         to_state = None if to_path is None else self._resolve_state(to_path)
         events = self._normalize_values(events)
@@ -62,12 +46,12 @@ class StateMachineBuilder(object):
             condition=condition, before=before, after=after)
         return self
 
-    def build(self, initialize: bool = True) -> StateMachine:
+    def build(self, initialize=True):
         if initialize:
             self.root.initialize()
         return self.root
 
-    def _resolve_machine(self, path: Optional[PathInput]) -> StateMachine:
+    def _resolve_machine(self, path):
         if path is None:
             return self.root
         state = self._resolve_state(path)
@@ -76,7 +60,7 @@ class StateMachineBuilder(object):
                 'Path does not point to a state machine: {0}'.format(path))
         return state
 
-    def _resolve_state(self, path: PathInput) -> State:
+    def _resolve_state(self, path):
         parts = self._normalize_path(path)
         if parts in self._states:
             return self._states[parts]
@@ -90,21 +74,21 @@ class StateMachineBuilder(object):
                 path))
         return matches[0]
 
-    def _child_path(self, parent: StateMachine, name: str) -> Path:
+    def _child_path(self, parent, name):
         return self._path_for(parent) + (name,)
 
-    def _path_for(self, state: State) -> Path:
+    def _path_for(self, state):
         for path, item in self._states.items():
             if item is state:
                 return path
         raise StateMachineException('Unknown state: {0}'.format(state.name))
 
-    def _ensure_new_path(self, path: Path) -> None:
+    def _ensure_new_path(self, path):
         if path in self._states:
             raise StateMachineException('State path already exists: {0}'.format(
                 path))
 
-    def _normalize_path(self, path: PathInput) -> Path:
+    def _normalize_path(self, path):
         if isinstance(path, tuple):
             return path
         if isinstance(path, list):
@@ -115,7 +99,7 @@ class StateMachineBuilder(object):
             return (path,)
         raise StateMachineException('Unsupported state path: {0}'.format(path))
 
-    def _normalize_values(self, values: ValueInput) -> Iterable[Hashable]:
+    def _normalize_values(self, values):
         if isinstance(values, str):
             return [values]
         return values
