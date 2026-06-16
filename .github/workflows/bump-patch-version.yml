@@ -1,11 +1,12 @@
 name: Bump Patch Version
 
 on:
-  pull_request_target:
-    types:
-      - closed
+  push:
     branches:
       - master
+    paths:
+      - CHANGELOG.md
+      - pysm/**
 
 permissions:
   contents: write
@@ -17,12 +18,10 @@ concurrency:
 jobs:
   bump:
     name: Bump patch version
-    if: github.event.pull_request.merged == true
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
 
     steps:
-      # This workflow has write permission. Keep it on the trusted base branch
-      # and do not check out pull request code here.
       - name: Check out master
         uses: actions/checkout@v6
         with:
@@ -36,132 +35,135 @@ jobs:
 
       - name: Check package changes
         id: package_changes
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           package_changed="false"
           version_changed="false"
-          while IFS= read -r file; do
-            case "$file" in
-              pysm/version.py)
-                version_changed="true"
-                package_changed="true"
-                ;;
-              pysm/*)
-                package_changed="true"
-                ;;
-            esac
+
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+          empty_tree="0000000000000000000000000000000000000000"
+
+          if [ "$before" = "$empty_tree" ]; then
+            changes="$(git diff-tree --no-commit-id --name-status -r "$after")"
+          else
+            changes="$(git diff --name-status "$before" "$after")"
+          fi
+
+          while IFS=$'\t' read -r status path renamed_path; do
+            for file in "$path" "$renamed_path"; do
+              if [ -z "$file" ]; then
+                continue
+              fi
+
+              case "$file" in
+                pysm/version.py)
+                  version_changed="true"
+                  package_changed="true"
+                  ;;
+                pysm/*)
+                  package_changed="true"
+                  ;;
+              esac
+            done
           done < <(
-            gh api --paginate \
-              "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
-              --jq '.[] | .filename, (.previous_filename // empty)'
+            printf '%s\n' "$changes"
           )
 
           echo "package_changed=$package_changed" >> "$GITHUB_OUTPUT"
           echo "version_changed=$version_changed" >> "$GITHUB_OUTPUT"
 
-      - name: Find existing automated bump
-        id: existing_bump
-        if: |
-          steps.package_changes.outputs.package_changed == 'true' &&
-          steps.package_changes.outputs.version_changed != 'true'
-        run: |
-          marker="^Automated-bump-for-pr: ${{ github.event.pull_request.number }}$"
-          sha="$(git log --format=%H --grep="$marker" -n 1)"
-          if [ -n "$sha" ]; then
-            version="$(
-              git show "$sha:pysm/version.py" |
-              python -c 'import sys; namespace = {}; exec(sys.stdin.read(), namespace); print(namespace["__version__"])'
-            )"
-            echo "processed=true" >> "$GITHUB_OUTPUT"
-            echo "sha=$sha" >> "$GITHUB_OUTPUT"
-            echo "version=$version" >> "$GITHUB_OUTPUT"
-          else
-            echo "processed=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Bump patch version
         id: bump
         if: |
           steps.package_changes.outputs.package_changed == 'true' &&
-          steps.package_changes.outputs.version_changed != 'true' &&
-          steps.existing_bump.outputs.processed != 'true'
+          steps.package_changes.outputs.version_changed != 'true'
         run: |
           version="$(python .github/scripts/bump_patch_version.py)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Skip already processed patch bump
-        if: steps.existing_bump.outputs.processed == 'true'
-        run: echo "This pull request already has an automated patch bump; ensuring the tag and release exist."
-
-      - name: Build changelog entry
+      - name: Read explicit package version
+        id: explicit_version
         if: |
           steps.package_changes.outputs.package_changed == 'true' &&
-          steps.package_changes.outputs.version_changed != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.bump.outputs.version || steps.existing_bump.outputs.version }}
+          steps.package_changes.outputs.version_changed == 'true'
         run: |
-          gh api \
-            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}" \
-            > /tmp/release-pr.json
-          python .github/scripts/prepend_changelog_entry.py \
-            --version "$VERSION" \
-            --date "$(date -u +%F)" \
-            --pr-json /tmp/release-pr.json \
+          version="$(python -c 'namespace = {}; exec(open("pysm/version.py", encoding="utf-8").read(), namespace); print(namespace["__version__"])')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Select release version
+        id: release_version
+        if: steps.package_changes.outputs.package_changed == 'true'
+        env:
+          BUMP_VERSION: ${{ steps.bump.outputs.version }}
+          EXPLICIT_VERSION: ${{ steps.explicit_version.outputs.version }}
+        run: |
+          version="${BUMP_VERSION:-$EXPLICIT_VERSION}"
+          if [ -z "$version" ]; then
+            echo "Could not determine release version."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes
+        if: steps.package_changes.outputs.package_changed == 'true'
+        run: |
+          python .github/scripts/extract_changelog_entry.py \
+            --version "${{ steps.release_version.outputs.version }}" \
             --changelog CHANGELOG.md \
-            --notes-file /tmp/release-notes.md
+            --output /tmp/release-notes.md
 
       - name: Commit patch bump
         id: commit
         if: |
           steps.package_changes.outputs.package_changed == 'true' &&
-          steps.package_changes.outputs.version_changed != 'true' &&
-          steps.existing_bump.outputs.processed != 'true'
+          steps.package_changes.outputs.version_changed != 'true'
         run: |
-          if git diff --quiet -- pysm/version.py CHANGELOG.md; then
-            echo "No version or changelog change detected."
+          if git diff --quiet -- pysm/version.py; then
+            echo "No version change detected."
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pysm/version.py CHANGELOG.md
-          git commit \
-            -m "Bump patch version to ${{ steps.bump.outputs.version }} [skip ci]" \
-            -m "Automated-bump-for-pr: ${{ github.event.pull_request.number }}"
+          git add pysm/version.py
+          git commit -m "Bump patch version to ${{ steps.bump.outputs.version }} [skip ci]"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "committed=true" >> "$GITHUB_OUTPUT"
           git push origin HEAD:master
 
       - name: Create tag and GitHub release
         if: |
-          steps.commit.outputs.committed == 'true' ||
-          steps.existing_bump.outputs.processed == 'true'
+          steps.package_changes.outputs.version_changed == 'true' ||
+          steps.commit.outputs.committed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.bump.outputs.version || steps.existing_bump.outputs.version }}
-          COMMIT_SHA: ${{ steps.commit.outputs.sha || steps.existing_bump.outputs.sha }}
+          TAG: ${{ steps.release_version.outputs.tag }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
         run: |
-          tag="v$VERSION"
+          target_sha="${COMMIT_SHA:-$(git rev-parse HEAD)}"
 
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            git fetch --quiet --force origin "refs/tags/$tag:refs/tags/$tag"
-            tag_sha="$(git rev-list -n 1 "$tag")"
-            if [ "$tag_sha" != "$COMMIT_SHA" ]; then
-              echo "Tag $tag already exists at $tag_sha, expected $COMMIT_SHA."
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch --quiet --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            tag_sha="$(git rev-list -n 1 "$TAG")"
+            if [ "$tag_sha" != "$target_sha" ]; then
+              echo "Tag $TAG already exists at $tag_sha, expected $target_sha."
               exit 1
             fi
+            echo "Tag $TAG already exists at the expected commit."
           else
-            git tag -a "$tag" -m "$tag" "$COMMIT_SHA"
-            git push origin "refs/tags/$tag"
+            git tag -a "$TAG" -m "$TAG" "$target_sha"
+            git push origin "refs/tags/$TAG"
           fi
 
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
           else
-            gh release create "$tag" --title "$tag" --notes-file /tmp/release-notes.md
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file /tmp/release-notes.md
           fi
 
       - name: Skip patch bump
@@ -170,4 +172,4 @@ jobs:
 
       - name: Skip patch bump for explicit version change
         if: steps.package_changes.outputs.version_changed == 'true'
-        run: echo "pysm/version.py changed in the merged PR; skipping automatic patch bump."
+        run: echo "pysm/version.py changed in this push; using the explicit version for the release."
