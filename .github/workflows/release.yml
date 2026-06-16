@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out master
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Read package version
+        id: version
+        run: |
+          version="$(python -c 'namespace = {}; exec(open("pysm/version.py", encoding="utf-8").read(), namespace); print(namespace["__version__"])')"
+          tag="v$version"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes
+        run: |
+          python .github/scripts/extract_changelog_entry.py \
+            --version "${{ steps.version.outputs.version }}" \
+            --changelog CHANGELOG.md \
+            --output /tmp/release-notes.md
+
+      - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --quiet --tags origin
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            tag_sha="$(git rev-list -n 1 "$TAG")"
+            head_sha="$(git rev-parse HEAD)"
+            if [ "$tag_sha" != "$head_sha" ]; then
+              echo "Tag $TAG already exists at $tag_sha, expected $head_sha."
+              exit 1
+            fi
+            echo "Tag $TAG already exists at the current commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "refs/tags/$TAG"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+            exit 0
+          fi
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file /tmp/release-notes.md
