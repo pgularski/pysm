@@ -1,0 +1,49 @@
+name: Bump Patch Version
+
+on:
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    name: Bump patch version
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-22.04
+
+    steps:
+      # This workflow has write permission. Keep it on the trusted base branch
+      # and do not check out pull request code here.
+      - name: Check out master
+        uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          version="$(python .github/scripts/bump_patch_version.py)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Commit patch bump
+        run: |
+          if git diff --quiet -- pysm/version.py; then
+            echo "No version change detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pysm/version.py
+          git commit -m "Bump patch version to ${{ steps.bump.outputs.version }} [skip ci]"
+          git push origin HEAD:master
