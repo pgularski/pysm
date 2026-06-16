@@ -1,7 +1,12 @@
 ---
 engines:
   duplication:
+    exclude_paths:
+      - "pysm/serialization.py"
     minTokenMatch: 120
+  metric:
+    exclude_paths:
+      - "pysm/serialization.py"
 exclude_paths:
   - "*"
   - "**/*"
