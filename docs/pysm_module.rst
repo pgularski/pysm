@@ -1,6 +1,18 @@
 Module documentation
 ====================
 
+Public imports
+--------------
+
+The top-level package intentionally exports only the classic core runtime:
+``StateMachine``, ``State``, ``Event``, ``StateMachineException``, ``Stack``,
+``any_event``, ``AnyEvent``, ``logger``, ``__version__``, and
+``__version_info__``.
+
+Optional modules are documented below, but they are not imported by
+``import pysm``. Import them explicitly when you need their behavior.
+
+
 Core
 ----
 
