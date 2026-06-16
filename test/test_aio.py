@@ -30,6 +30,18 @@ def test_async_machine_behaves_like_core_for_simple_transition():
     asyncio.run(scenario())
 
 
+def test_async_dispatch_before_initialize_fails_clearly():
+    async def scenario():
+        machine = AsyncQueuedStateMachine('m')
+        off = State('off')
+        machine.add_state(off, initial=True)
+
+        with pytest.raises(StateMachineException, match='initialized'):
+            await machine.dispatch(Event('turn_on'))
+
+    asyncio.run(scenario())
+
+
 def test_async_initialize_rejects_sync_fire_events_on_init():
     machine = AsyncQueuedStateMachine('m')
     initial = State('initial')

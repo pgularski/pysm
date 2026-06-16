@@ -100,7 +100,7 @@ class AsyncQueuedStateMachine(StateMachine):
 
     async def _dispatch_one(self, event):
         event.state_machine = self
-        leaf_state_before = self.leaf_state
+        leaf_state_before = self._require_initialized()
         await self._on(leaf_state_before, event)
         transition = await self._get_transition(event)
         if transition is None:

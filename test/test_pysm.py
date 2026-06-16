@@ -701,6 +701,15 @@ def test_no_initial_state():
     assert expected in str(exc.value)
 
 
+def test_dispatch_before_initialize_fails_clearly():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    sm.add_state(s1, initial=True)
+
+    with pytest.raises(StateMachineException, match='initialized'):
+        sm.dispatch(Event('a'))
+
+
 def test_many_initial_states():
     sm = StateMachine('sm')
     s1 = State('s1')

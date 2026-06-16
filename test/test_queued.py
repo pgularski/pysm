@@ -26,6 +26,15 @@ def test_queued_machine_behaves_like_core_for_simple_transition():
     assert machine.leaf_state is on
 
 
+def test_queued_dispatch_before_initialize_fails_clearly():
+    machine = QueuedStateMachine('m')
+    off = State('off')
+    machine.add_state(off, initial=True)
+
+    with pytest.raises(StateMachineException, match='initialized'):
+        machine.dispatch(Event('turn_on'))
+
+
 def test_queued_initialize_can_fire_enter_handlers_on_initial_hsm_path():
     calls = []
     machine = QueuedStateMachine('root')

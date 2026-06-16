@@ -692,9 +692,7 @@ class StateMachine(State):
                 self._transitions.add(key, transition)
 
     def _get_transition(self, event):
-        leaf_state = self.leaf_state
-        assert leaf_state is not None
-        machine = leaf_state.parent
+        machine = self._require_initialized().parent
         while machine:
             transition = machine._transitions.get(event)
             if transition:
@@ -718,6 +716,14 @@ class StateMachine(State):
         '''
         return self.root_machine._leaf_state
         #  return self._get_leaf_state(self)
+
+    def _require_initialized(self):
+        leaf_state = self.leaf_state
+        if leaf_state is None:
+            raise StateMachineException(
+                'StateMachine "{0}" must be initialized before dispatch'
+                .format(self.name))
+        return leaf_state
 
     def _get_leaf_state(self, state):
         while hasattr(state, 'state') and state.state is not None:
@@ -778,8 +784,7 @@ class StateMachine(State):
 
         '''
         event.state_machine = self
-        leaf_state_before = self.leaf_state
-        assert leaf_state_before is not None
+        leaf_state_before = self._require_initialized()
         leaf_state_before._on(event)
         transition = self._get_transition(event)
         if transition is None:
@@ -796,8 +801,7 @@ class StateMachine(State):
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:
             return None
-        state = self.leaf_state
-        assert state is not None
+        state = self._require_initialized()
         self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and
