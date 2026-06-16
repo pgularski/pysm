@@ -1,5 +1,14 @@
+import operator
 import string as py_string
 from pysm import StateMachine, Event, State
+
+
+OPERATORS = {
+    '+': operator.add,
+    '-': operator.sub,
+    '*': operator.mul,
+    '/': operator.truediv,
+}
 
 
 class Calculator(object):
@@ -54,8 +63,7 @@ class Calculator(object):
         operation = event.input
         y = self.sm.stack.pop()
         x = self.sm.stack.pop()
-        # eval is evil
-        result = eval('float({0}) {1} float({2})'.format(x, operation, y))
+        result = OPERATORS[operation](float(x), float(y))
         self.sm.stack.push(result)
         return True
 
