@@ -16,6 +16,41 @@ This is a simple state machine with only two states - `on` and `off`.
     :literal:
 
 
+Fluent builder
+--------------
+
+The optional builder module reduces setup boilerplate while still using the
+same ``StateMachine``, ``State``, and ``Event`` classes at runtime.
+
+.. code-block:: python
+
+    from pysm import Event
+    from pysm.builder import StateMachineBuilder
+
+    machine = (StateMachineBuilder('toggle')
+               .state('off', initial=True)
+               .state('on')
+               .transition('off', 'on', events='turn_on')
+               .transition('on', 'off', events='turn_off')
+               .build())
+
+    machine.dispatch(Event('turn_on'))
+    assert machine.leaf_state.name == 'on'
+
+Nested machines can be addressed by path when short state names would be
+ambiguous:
+
+.. code-block:: python
+
+    machine = (StateMachineBuilder('oven')
+               .machine('door_closed', initial=True)
+               .state('off', initial=True, parent_path='door_closed')
+               .machine('heating', parent_path='door_closed')
+               .state('baking', initial=True, parent_path='heating')
+               .transition('off', 'baking', events='bake')
+               .build())
+
+
 Complex hierarchical state machine
 ----------------------------------
 
@@ -61,6 +96,101 @@ behaves as a `Pushdown Automaton (PDA)
 
 .. include:: ../examples/rpn_calculator.py
     :literal:
+
+
+Queued dispatch
+---------------
+
+``QueuedStateMachine`` is useful when handlers may dispatch more events and
+you want deterministic run-to-completion scheduling.
+
+.. code-block:: python
+
+    from pysm import Event, State
+    from pysm.queued import QueuedStateMachine
+
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+
+    def enter_b(state, event):
+        calls.append('enter_b')
+        machine.dispatch(Event('finish'))
+        calls.append('enter_b_returned')
+
+    b.handlers = {'enter': enter_b}
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_transition(a, b, events=['go'])
+    machine.add_transition(
+        b, None, events=['finish'],
+        action=lambda state, event: calls.append('finish'))
+    machine.initialize()
+
+    machine.dispatch(Event('go'))
+    assert calls == ['enter_b', 'enter_b_returned', 'finish']
+
+
+Async dispatch
+--------------
+
+``AsyncQueuedStateMachine`` awaits async handlers, conditions, and transition
+callbacks while preserving the same callback order as the synchronous runtime.
+
+.. code-block:: python
+
+    from pysm import Event, State
+    from pysm.aio import AsyncQueuedStateMachine
+
+    async def main():
+        machine = AsyncQueuedStateMachine('m')
+        idle = State('idle')
+        ready = State('ready')
+
+        async def enter_ready(state, event):
+            await machine.dispatch(Event('validate'))
+
+        ready.handlers = {'enter': enter_ready}
+
+        machine.add_state(idle, initial=True)
+        machine.add_state(ready)
+        machine.add_transition(idle, ready, events=['go'])
+        machine.add_transition(ready, None, events=['validate'])
+        machine.initialize()
+
+        await machine.dispatch(Event('go'))
+        assert machine.leaf_state is ready
+
+
+Snapshot and restore
+--------------------
+
+The serialization helper stores active machine state as plain Python data.
+Recreate the same graph, initialize it, and then restore the snapshot.
+
+.. code-block:: python
+
+    from pysm import Event
+    from pysm.builder import StateMachineBuilder
+    from pysm.serialization import restore, snapshot
+
+    def build_toggle():
+        return (StateMachineBuilder('toggle')
+                .state('off', initial=True)
+                .state('on')
+                .transition('off', 'on', events='turn_on')
+                .transition('on', 'off', events='turn_off')
+                .build())
+
+    machine = build_toggle()
+    machine.dispatch(Event('turn_on'))
+    data = snapshot(machine, metadata={'source': 'example'})
+
+    restored = build_toggle()
+    restore(restored, data)
+
+    assert restored.leaf_state.name == 'on'
 
 
 ----

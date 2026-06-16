@@ -52,6 +52,23 @@ Core vs Optional Modules
      - Development-time only
 
 
+Core Behavior Updates
+---------------------
+
+The core API is still the same explicit building-block API, but recent runtime
+hardening added a few details worth making visible:
+
+* ``dispatch()`` now raises ``StateMachineException`` if the machine has not
+  been initialized. Call ``initialize()`` on the root machine after adding all
+  states and transitions.
+* The built-in ``state_stack``, ``leaf_state_stack``, and ``stack`` on
+  ``StateMachine`` instances are bounded by ``StateMachine.STACK_SIZE``. The
+  default is ``32``. If you need an unbounded standalone stack, create
+  ``Stack(maxlen=None)`` yourself.
+* The core import does not load ``asyncio``, ``json``, ``threading``, or any of
+  the optional ``pysm.*`` helper modules.
+
+
 Initial Entry Events
 --------------------
 
@@ -75,6 +92,8 @@ opt in explicitly:
 
 For hierarchical machines, ``enter`` handlers fire from the root's initial
 child down to the active leaf state. The root machine itself is not entered.
+Queued and async machines keep the same ordering, but they drain any events
+dispatched by initial ``enter`` handlers only after the initial path is ready.
 
 
 Queued Run-To-Completion Dispatch
@@ -125,6 +144,10 @@ accidental internal event cycle:
 .. code-block:: python
 
    machine = QueuedStateMachine('m', max_internal_steps=100)
+
+If a handler, condition, or transition callback raises, the queued runtime
+clears pending internal and external work before re-raising the original
+exception. A later dispatch starts from a clean queue.
 
 
 Thread-Safe Queued Dispatch
@@ -183,6 +206,14 @@ Use ``await machine.async_initialize(fire_events_on_init=True)`` if initial
 ``enter`` handlers need to be awaited.
 
 
+Typed Packages
+--------------
+
+The distribution ships ``py.typed`` and ``.pyi`` files for the core and
+optional modules. This gives static type checkers a public API surface without
+adding runtime annotations to the MicroPython-friendly core.
+
+
 Snapshot And Restore
 --------------------
 
@@ -212,6 +243,16 @@ machine because different branches may contain states with the same name.
 Restore is strict and raises if the saved topology does not match the machine
 being restored.
 
+Pass ``metadata`` when your persistence layer needs application data next to
+the runtime state:
+
+.. code-block:: python
+
+   data = snapshot(machine, metadata={'schema': 3})
+
+The metadata is copied into the returned dictionary, but restore only uses the
+runtime fields.
+
 
 Builder
 -------
@@ -230,7 +271,21 @@ and does not add methods to your domain objects.
               .transition('on', 'off', events=['turn_off'])
               .build())
 
-For nested machines, use paths when short names would be ambiguous.
+For nested machines, use paths when short names would be ambiguous:
+
+.. code-block:: python
+
+   machine = (StateMachineBuilder('oven')
+              .machine('door_closed', initial=True)
+              .state('off', initial=True, parent_path='door_closed')
+              .machine('heating', parent_path='door_closed')
+              .state('baking', initial=True, parent_path='heating')
+              .transition('off', 'baking', events='bake')
+              .build())
+
+String ``events`` and ``input`` values are treated as one event or input value,
+not as iterables of characters. Use a list, tuple, or other iterable when a
+single transition should match many values.
 
 
 MicroPython / upysm

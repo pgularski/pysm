@@ -8,7 +8,13 @@ Python State Machine
 ``pysm`` is a tiny, explicit hierarchical state machine library. The classic
 core remains dependency-free and suitable for small runtimes, while optional
 modules provide run-to-completion event scheduling, thread-safe dispatch,
-async dispatch, serialization, and builder ergonomics.
+async dispatch, serialization, builder ergonomics, and shipped type
+information for editors and type checkers.
+
+The core runtime still follows the original composition-first style: create
+states, add them to a root machine, add transitions, initialize the machine,
+and dispatch hashable events. Newer helpers are layered around that core
+instead of changing the top-level import.
 
 Core imports stay small:
 
