@@ -1,0 +1,76 @@
+name: Bump Patch Version
+
+on:
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    name: Bump patch version
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-22.04
+
+    steps:
+      # This workflow has write permission. Keep it on the trusted base branch
+      # and do not check out pull request code here.
+      - name: Check out master
+        uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Check package changes
+        id: package_changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          changed="false"
+          while IFS= read -r file; do
+            case "$file" in
+              pysm/*)
+                changed="true"
+                break
+                ;;
+            esac
+          done < <(
+            gh api --paginate \
+              "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+              --jq '.[] | .filename, (.previous_filename // empty)'
+          )
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Bump patch version
+        id: bump
+        if: steps.package_changes.outputs.changed == 'true'
+        run: |
+          version="$(python .github/scripts/bump_patch_version.py)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Commit patch bump
+        if: steps.package_changes.outputs.changed == 'true'
+        run: |
+          if git diff --quiet -- pysm/version.py; then
+            echo "No version change detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pysm/version.py
+          git commit -m "Bump patch version to ${{ steps.bump.outputs.version }} [skip ci]"
+          git push origin HEAD:master
+
+      - name: Skip patch bump
+        if: steps.package_changes.outputs.changed != 'true'
+        run: echo "No files under pysm/ changed; skipping patch bump."

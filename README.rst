@@ -4,11 +4,9 @@ pysm - Python State Machine
 Versatile and flexible Python State Machine library.
 
 
-.. image:: https://travis-ci.org/pgularski/pysm.svg?branch=master
-    :target: https://travis-ci.org/pgularski/pysm
-
-.. image:: https://coveralls.io/repos/github/pgularski/pysm/badge.svg?branch=master
-    :target: https://coveralls.io/github/pgularski/pysm?branch=master
+.. image:: https://github.com/pgularski/pysm/actions/workflows/ci.yml/badge.svg
+    :target: https://github.com/pgularski/pysm/actions/workflows/ci.yml
+    :alt: CI
 
 .. image:: https://api.codacy.com/project/badge/Grade/6f18f01639c242a0b83280a52245539d
     :target: https://www.codacy.com/app/pgularski/pysm?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pgularski/pysm&amp;utm_campaign=Badge_Grade
@@ -23,7 +21,7 @@ Versatile and flexible Python State Machine library.
 
 
 Implement simple and complex state machines
-------------------------------------------
+-------------------------------------------
 
 It can do simple things like this:
 
@@ -78,6 +76,7 @@ Features
 * Fast (even with hundreds of transition rules)
 * Not too many pythonisms, so that it's easily portable to other languages (ie. `JavaScript <https://github.com/pgularski/smjs>`_).
 * Micropython support
+* Optional queued, thread-safe, async, serialization, builder, and typing helpers are available as explicit imports, so the core import stays small.
 
 
 Installation
@@ -99,10 +98,20 @@ Documentation
 
 Read the docs for API documentation and examples - http://pysm.readthedocs.io/
 
+The full documentation also covers the optional queued, thread-safe, async,
+serialization, and builder modules.
+
 See Unit Tests to see it working and extensively tested.
+
 
 Micropython support
 -------------------
+
+The core runtime remains the intended shape for memory-constrained
+MicroPython/upysm builds. Optional CPython-oriented modules should stay out of
+device builds unless you explicitly need them and have measured the memory
+cost.
+
 The library works with pyboards!::
 
    import upip
@@ -111,6 +120,7 @@ The library works with pyboards!::
 
 Links
 -----
+
 * `Documentation <http://pysm.readthedocs.io>`_
 * `Installation <http://pysm.readthedocs.io/en/latest/installing.html>`_
 * `Github <https://github.com/pgularski/pysm>`_

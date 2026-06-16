@@ -1,3 +1,4 @@
+# pyright: basic
 '''Python State Machine
 
 The goal of this library is to give you a close to the State Pattern
@@ -25,15 +26,71 @@ Goals:
 .. |Callable| replace:: :class:`~collections.Callable`
 
 '''
-import logging
 import sys
-from collections import defaultdict, deque
+from collections import deque
+
+try:
+    from collections import defaultdict
+except ImportError:
+    class defaultdict(object):
+        def __init__(self, default_factory=None):
+            self.default_factory = default_factory
+            self._data = {}
+
+        def __getitem__(self, key):
+            try:
+                return self._data[key]
+            except KeyError:
+                return self.__missing__(key)
+
+        def __setitem__(self, key, value):
+            self._data[key] = value
+
+        def __missing__(self, key):
+            if self.default_factory is None:
+                raise KeyError(key)
+            value = self.default_factory()
+            self[key] = value
+            return value
+
+try:
+    import logging
+except ImportError:
+    class _NoopLogger(object):
+        def addHandler(self, handler):
+            pass
+
+        def setLevel(self, level):
+            pass
+
+        def debug(self, *args, **kwargs):
+            pass
+
+        def info(self, *args, **kwargs):
+            pass
+
+        def warning(self, *args, **kwargs):
+            pass
+
+        def error(self, *args, **kwargs):
+            pass
+
+    class _LoggingFallback(object):
+        INFO = 20
+
+        def getLogger(self, name):
+            return _NoopLogger()
+
+        def StreamHandler(self, stream=None):
+            return None
+
+    logging = _LoggingFallback()
 
 
 # Required to make it Micropython compatible
 if str(type(defaultdict)).find('module') > 0:
     # pylint: disable=no-member
-    defaultdict = defaultdict.defaultdict
+    defaultdict = defaultdict.defaultdict  # type: ignore[attr-defined]
 
 
 # Required to make it Micropython compatible
@@ -44,12 +101,21 @@ def patch_deque(deque_module):
             if iterable is None:
                 iterable = []
             if maxlen in [None, 0]:
-                maxlen = float('Inf')
-            self.q = deque_module.deque(iterable, maxlen)
+                self.q = list(iterable)
+                maxlen = 0
+            else:
+                self.q = deque_module.deque(iterable, maxlen)
             self.maxlen = maxlen
 
         def pop(self):
             return self.q.pop()
+
+        def popleft(self):
+            if hasattr(self.q, 'popleft'):
+                return self.q.popleft()
+            if not self.q:
+                raise IndexError('pop from an empty deque')
+            return self.q.pop(0)
 
         def append(self, item):
             if self.maxlen > 0 and len(self.q) >= self.maxlen:
@@ -69,7 +135,10 @@ def patch_deque(deque_module):
             return iter(self.q)
 
         def __getitem__(self, key):
-            return self.q[key]
+            try:
+                return self.q[key]
+            except IndexError:
+                raise IndexError('deque index out of range')
 
     return deque_maxlen
 
@@ -172,7 +241,7 @@ class Event(object):
         self.propagate = True
         self.cargo = cargo
         # This must be always the root machine
-        self.state_machine = None
+        self.state_machine = None  # type: object
 
     def __repr__(self):
         return '<Event {0}, input={1}, cargo={2} ({3})>'.format(
@@ -341,7 +410,10 @@ class TransitionsContainer(object):
 
 class Stack(object):
     def __init__(self, maxlen=None):
-        self.deque = deque(maxlen=maxlen)
+        if maxlen is None:
+            self.deque = deque()
+        else:
+            self.deque = deque(maxlen=maxlen)
 
     def pop(self):
         return self.deque.pop()
@@ -620,7 +692,7 @@ class StateMachine(State):
                 self._transitions.add(key, transition)
 
     def _get_transition(self, event):
-        machine = self.leaf_state.parent
+        machine = self._require_initialized().parent
         while machine:
             transition = machine._transitions.get(event)
             if transition:
@@ -645,12 +717,20 @@ class StateMachine(State):
         return self.root_machine._leaf_state
         #  return self._get_leaf_state(self)
 
+    def _require_initialized(self):
+        leaf_state = self.leaf_state
+        if leaf_state is None:
+            raise StateMachineException(
+                'StateMachine "{0}" must be initialized before dispatch'
+                .format(self.name))
+        return leaf_state
+
     def _get_leaf_state(self, state):
         while hasattr(state, 'state') and state.state is not None:
             state = state.state
         return state
 
-    def initialize(self):
+    def initialize(self, fire_events_on_init=False):
         '''Initialize states in the state machine.
 
         After a state machine has been created and all states are added to it,
@@ -672,6 +752,26 @@ class StateMachine(State):
                     machines.append(child_state)
 
         self._leaf_state = self._get_leaf_state(self)
+        if fire_events_on_init:
+            self._enter_initial_states()
+
+    def _initial_entry_path(self):
+        path = []
+        state = self.state
+        while state is not None:
+            path.append(state)
+            if not isinstance(state, StateMachine):
+                break
+            state = state.state
+        return path
+
+    def _enter_initial_states(self):
+        for state in self._initial_entry_path():
+            logger.debug('entering %s', state.name)
+            enter_event = Event('enter', propagate=False, source_event=None)
+            enter_event.state_machine = self
+            self.root_machine._leaf_state = state
+            state._on(enter_event)
 
     def dispatch(self, event):
         '''Dispatch an event to a state machine.
@@ -684,7 +784,7 @@ class StateMachine(State):
 
         '''
         event.state_machine = self
-        leaf_state_before = self.leaf_state
+        leaf_state_before = self._require_initialized()
         leaf_state_before._on(event)
         transition = self._get_transition(event)
         if transition is None:
@@ -701,7 +801,7 @@ class StateMachine(State):
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:
             return None
-        state = self.leaf_state
+        state = self._require_initialized()
         self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and
@@ -712,9 +812,11 @@ class StateMachine(State):
             exit_event.state_machine = self
             self.root_machine._leaf_state = state
             state._on(exit_event)
-            state.parent.state_stack.push(state)
-            state.parent.state = state.parent.initial_state
-            state = state.parent
+            parent = state.parent
+            assert parent is not None
+            parent.state_stack.push(state)
+            parent.state = parent.initial_state
+            state = parent
         return state
 
     def _enter_states(self, event, top_state, to_state):
@@ -732,7 +834,9 @@ class StateMachine(State):
             enter_event.state_machine = self
             self.root_machine._leaf_state = state
             state._on(enter_event)
-            state.parent.state = state
+            parent = state.parent
+            assert parent is not None
+            parent.state = state
 
     def set_previous_leaf_state(self, event=None):
         '''Transition to a previous leaf state. This makes a dynamic transition

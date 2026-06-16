@@ -1,4 +1,7 @@
-import mock
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 import pytest
 import pysm
 import logging
@@ -189,6 +192,36 @@ def test_conditions():
     assert sm.state == broken
     sm.dispatch(_e('idle'))
     assert sm.state == idling
+
+
+def test_condition_must_return_literal_true_not_truthy_value():
+    calls = []
+    idling = State('idling')
+    truthy = State('truthy')
+    literal = State('literal')
+
+    def truthy_condition(state, event):
+        calls.append('truthy')
+        return 1
+
+    def literal_true_condition(state, event):
+        calls.append('literal')
+        return True
+
+    sm = StateMachine('sm')
+    sm.add_state(idling, initial=True)
+    sm.add_state(truthy)
+    sm.add_state(literal)
+    sm.add_transition(idling, truthy, events=['run'],
+                      condition=truthy_condition)
+    sm.add_transition(idling, literal, events=['run'],
+                      condition=literal_true_condition)
+    sm.initialize()
+
+    sm.dispatch(_e('run'))
+
+    assert calls == ['truthy', 'literal']
+    assert sm.state is literal
 
 
 def test_internal_transition():
@@ -666,6 +699,15 @@ def test_no_initial_state():
         sm.initialize()
     expected = ('Machine "sm" error: Machine "sm" has no initial state')
     assert expected in str(exc.value)
+
+
+def test_dispatch_before_initialize_fails_clearly():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    sm.add_state(s1, initial=True)
+
+    with pytest.raises(StateMachineException, match='initialized'):
+        sm.dispatch(Event('a'))
 
 
 def test_many_initial_states():
@@ -1399,9 +1441,167 @@ def test_transition_on_any_event():
     assert m.leaf_state == s0
 
 
-def enter_on_initialize():
-    # TODO: Do I want this behaviour? It's not implemented atm.
-    pass
+def test_initialize_does_not_fire_enter_handlers_by_default():
+    calls = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = State('s1')
+
+    for state in (m, s0, s1):
+        state.handlers = {
+            'enter': lambda state, event: calls.append(state.name),
+        }
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+
+    m.initialize()
+
+    assert m.leaf_state is s1
+    assert calls == []
+
+
+def test_initialize_can_fire_enter_handlers_on_initial_hsm_path():
+    calls = []
+    event_details = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+    s2 = State('s2')
+
+    def on_enter(state, event):
+        assert m.leaf_state is state
+        calls.append(state.name)
+        event_details.append((
+            event.name,
+            event.state_machine,
+            event.propagate,
+            event.cargo.get('source_event', 'missing'),
+        ))
+
+    def on_exit(state, event):
+        pytest.fail('initialize must not fire exit handlers')
+
+    for state in (m, s0, s1, s11, s2):
+        state.handlers = {'enter': on_enter, 'exit': on_exit}
+
+    m.add_state(s0, initial=True)
+    m.add_state(s2)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s11, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert m.state is s0
+    assert s0.state is s1
+    assert s1.state is s11
+    assert m.leaf_state is s11
+    assert calls == ['s0', 's1', 's11']
+    assert event_details == [
+        ('enter', m, False, None),
+        ('enter', m, False, None),
+        ('enter', m, False, None),
+    ]
+
+
+def test_initialize_enters_only_active_path_in_complex_hsm():
+    calls = []
+    snapshots = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+    s2 = StateMachine('s2')
+    s21 = StateMachine('s21')
+    s211 = State('s211')
+
+    def on_enter(state, event):
+        assert m.leaf_state is state
+        calls.append(state.name)
+        snapshots.append((
+            m.state.name,
+            s0.state.name,
+            s1.state.name,
+            s2.state.name,
+            s21.state.name,
+        ))
+
+    for state in (m, s0, s1, s11, s2, s21, s211):
+        state.handlers = {'enter': on_enter}
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s0.add_state(s2)
+    s1.add_state(s11, initial=True)
+    s2.add_state(s21, initial=True)
+    s21.add_state(s211, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert m.leaf_state is s11
+    assert calls == ['s0', 's1', 's11']
+    assert snapshots == [
+        ('s0', 's1', 's11', 's21', 's211'),
+        ('s0', 's1', 's11', 's21', 's211'),
+        ('s0', 's1', 's11', 's21', 's211'),
+    ]
+
+
+def test_initialize_enter_events_do_not_propagate():
+    calls = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = State('s1')
+
+    def on_parent_enter(state, event):
+        calls.append(('parent', state.name))
+
+    def on_leaf_enter(state, event):
+        calls.append(('leaf', state.name))
+        event.propagate = True
+
+    m.handlers = {'enter': on_parent_enter}
+    s0.handlers = {'enter': on_parent_enter}
+    s1.handlers = {'enter': on_leaf_enter}
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert calls == [('parent', 's0'), ('leaf', 's1')]
+
+
+def test_initialize_enter_events_do_not_update_history_stacks():
+    calls = []
+
+    m = StateMachine('m')
+    s0 = StateMachine('s0')
+    s1 = StateMachine('s1')
+    s11 = State('s11')
+
+    def on_enter(state, event):
+        calls.append(state.name)
+
+    for state in (m, s0, s1, s11):
+        state.handlers = {'enter': on_enter}
+
+    m.add_state(s0, initial=True)
+    s0.add_state(s1, initial=True)
+    s1.add_state(s11, initial=True)
+
+    m.initialize(fire_events_on_init=True)
+
+    assert calls == ['s0', 's1', 's11']
+    assert list(m.state_stack.deque) == []
+    assert list(s0.state_stack.deque) == []
+    assert list(s1.state_stack.deque) == []
+    assert list(m.leaf_state_stack.deque) == []
 
 
 def test_micropython_deque():
@@ -1514,6 +1714,85 @@ def test_micropython_deque_maxlen_exceeded():
     finally:
         deque = old_deque
 
+
+def test_micropython_deque_unbounded_does_not_allocate_maxlen():
+    from pysm.pysm import patch_deque
+
+    class StrictMicropythonDeque(object):
+        def __init__(self, iterable, maxlen):
+            raise AssertionError(
+                'unbounded deque should not allocate maxlen={0}'.format(
+                    maxlen))
+
+    class StrictMicropythonDequeModule(object):
+        deque = StrictMicropythonDeque
+
+    deque = patch_deque(StrictMicropythonDequeModule)
+    queue = deque()
+    queue.append(1)
+    queue.append(2)
+
+    assert queue.popleft() == 1
+    assert queue.popleft() == 2
+
+    with pytest.raises(IndexError):
+        queue.popleft()
+
+
+def test_core_imports_without_logging_module(monkeypatch):
+    import builtins
+    import importlib.util
+    import os
+
+    real_import = builtins.__import__
+
+    def import_without_logging(name, *args, **kwargs):
+        if name == 'logging':
+            raise ImportError('no module named logging')
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', import_without_logging)
+
+    module_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'pysm', 'pysm.py')
+    spec = importlib.util.spec_from_file_location(
+        'pysm_without_logging', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    module.logger.debug('available')
+    module.logger.info('available')
+
+
+def test_core_imports_without_collections_defaultdict(monkeypatch):
+    import builtins
+    import collections
+    import importlib.util
+    import os
+    import types
+
+    real_import = builtins.__import__
+    collections_without_defaultdict = types.ModuleType('collections')
+    collections_without_defaultdict.deque = collections.deque
+
+    def import_without_defaultdict(name, *args, **kwargs):
+        if name == 'collections':
+            return collections_without_defaultdict
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', import_without_defaultdict)
+
+    module_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'pysm', 'pysm.py')
+    spec = importlib.util.spec_from_file_location(
+        'pysm_without_defaultdict', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    data = module.defaultdict(list)
+    data['events'].append('go')
+
+    assert data['events'] == ['go']
 
 
 def test_leaf_state_from_action_method():

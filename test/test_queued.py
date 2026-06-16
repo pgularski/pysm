@@ -1,0 +1,636 @@
+import threading
+
+import pytest
+
+from pysm import Event, State, StateMachine, StateMachineException
+from pysm.queued import QueuedStateMachine, ThreadSafeQueuedStateMachine
+
+
+class SchedulerAbort(BaseException):
+    pass
+
+
+def test_queued_machine_behaves_like_core_for_simple_transition():
+    machine = QueuedStateMachine('m')
+    off = State('off')
+    on = State('on')
+
+    machine.add_state(off, initial=True)
+    machine.add_state(on)
+    machine.add_transition(off, on, events=['turn_on'])
+    machine.initialize()
+
+    machine.dispatch(Event('turn_on'))
+
+    assert machine.state is on
+    assert machine.leaf_state is on
+
+
+def test_queued_dispatch_before_initialize_fails_clearly():
+    machine = QueuedStateMachine('m')
+    off = State('off')
+    machine.add_state(off, initial=True)
+
+    with pytest.raises(StateMachineException, match='initialized'):
+        machine.dispatch(Event('turn_on'))
+
+
+def test_queued_initialize_can_fire_enter_handlers_on_initial_hsm_path():
+    calls = []
+    machine = QueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+
+    def enter(state, event):
+        assert machine.leaf_state is state
+        calls.append((state.name, event.state_machine, event.cargo[
+            'source_event']))
+
+    child.handlers = {'enter': enter}
+    leaf.handlers = {'enter': enter}
+
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert machine.leaf_state is leaf
+    assert calls == [('child', machine, None), ('leaf', machine, None)]
+
+
+def test_queued_initialize_dispatch_from_enter_runs_after_initial_path():
+    calls = []
+    machine = QueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    done = State('done')
+
+    def enter_child(state, event):
+        calls.append('enter_child')
+        machine.dispatch(Event('finish'))
+
+    def enter_leaf(state, event):
+        calls.append('enter_leaf')
+
+    def finish(state, event):
+        calls.append('finish')
+
+    child.handlers = {'enter': enter_child}
+    leaf.handlers = {'enter': enter_leaf}
+
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    child.add_state(done)
+    child.add_transition(leaf, done, events=['finish'], action=finish)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['enter_child', 'enter_leaf', 'finish']
+    assert machine.leaf_state is done
+
+
+def test_queued_initialize_dispatch_waits_until_all_child_machines_are_ready():
+    calls = []
+    machine = QueuedStateMachine('root')
+    left = StateMachine('left')
+    active = State('active')
+    right = StateMachine('right')
+    right_child = StateMachine('right_child')
+    right_leaf = State('right_leaf')
+
+    def enter_left(state, event):
+        calls.append('enter_left')
+        machine.dispatch(Event('go'))
+        assert right.state is right_child
+        assert right_child.state is right_leaf
+
+    def enter_active(state, event):
+        calls.append('enter_active')
+
+    def go(state, event):
+        calls.append(('go', right.state.name, right_child.state.name))
+        assert right.state is right_child
+        assert right_child.state is right_leaf
+
+    def enter_right(state, event):
+        calls.append('enter_right')
+
+    def enter_right_child(state, event):
+        calls.append('enter_right_child')
+
+    def enter_right_leaf(state, event):
+        calls.append('enter_right_leaf')
+
+    left.handlers = {'enter': enter_left}
+    active.handlers = {'enter': enter_active}
+    right.handlers = {'enter': enter_right}
+    right_child.handlers = {'enter': enter_right_child}
+    right_leaf.handlers = {'enter': enter_right_leaf}
+
+    machine.add_state(left, initial=True)
+    machine.add_state(right)
+    left.add_state(active, initial=True)
+    right.add_state(right_child, initial=True)
+    right_child.add_state(right_leaf, initial=True)
+    machine.add_transition(left, right, events=['go'], action=go)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert calls == [
+        'enter_left',
+        'enter_active',
+        ('go', 'right_child', 'right_leaf'),
+        'enter_right',
+        'enter_right_child',
+        'enter_right_leaf',
+    ]
+    assert machine.leaf_state is right_leaf
+
+
+def test_threadsafe_initialize_dispatch_from_enter_uses_queued_semantics():
+    calls = []
+    machine = ThreadSafeQueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    done = State('done')
+
+    def enter_child(state, event):
+        calls.append('enter_child')
+        machine.dispatch(Event('finish'))
+
+    def enter_leaf(state, event):
+        calls.append('enter_leaf')
+
+    def finish(state, event):
+        calls.append('finish')
+
+    child.handlers = {'enter': enter_child}
+    leaf.handlers = {'enter': enter_leaf}
+
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    child.add_state(done)
+    child.add_transition(leaf, done, events=['finish'], action=finish)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['enter_child', 'enter_leaf', 'finish']
+    assert machine.leaf_state is done
+
+
+def test_queued_initialize_failure_clears_queues_and_processing_flag():
+    calls = []
+    machine = QueuedStateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+    done = State('done')
+
+    def enter_child(state, event):
+        calls.append('enter_child')
+        machine.dispatch(Event('finish'))
+        raise SchedulerAbort()
+
+    def finish(state, event):
+        calls.append('finish')
+
+    child.handlers = {'enter': enter_child}
+    machine.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    child.add_state(done)
+    child.add_transition(leaf, done, events=['finish'], action=finish)
+
+    with pytest.raises(SchedulerAbort):
+        machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['enter_child']
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+    child.handlers = {}
+    machine.initialize()
+    machine.dispatch(Event('finish'))
+
+    assert calls == ['enter_child', 'finish']
+    assert machine.leaf_state is done
+
+
+def test_queued_initialize_enforces_max_internal_steps_guard():
+    calls = []
+    machine = QueuedStateMachine('root', max_internal_steps=2)
+    leaf = State('leaf')
+
+    def enter_leaf(state, event):
+        machine.dispatch(Event('loop'))
+
+    def loop(state, event):
+        calls.append('loop')
+        machine.dispatch(Event('loop'))
+
+    leaf.handlers = {'enter': enter_leaf}
+    machine.add_state(leaf, initial=True)
+    machine.add_transition(leaf, None, events=['loop'], action=loop)
+
+    with pytest.raises(StateMachineException, match='max_internal_steps=2'):
+        machine.initialize(fire_events_on_init=True)
+
+    assert calls == ['loop', 'loop']
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+
+def test_internal_dispatch_from_enter_runs_after_current_transition_finishes():
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+    c = State('c')
+
+    def enter_b(state, event):
+        calls.append('enter_b')
+        machine.dispatch(Event('finish'))
+        calls.append('enter_b_returned')
+
+    def after_go(state, event):
+        calls.append('after_go')
+
+    def finish_action(state, event):
+        calls.append('finish_action')
+
+    b.handlers = {'enter': enter_b}
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_state(c)
+    machine.add_transition(a, b, events=['go'], after=after_go)
+    machine.add_transition(b, c, events=['finish'], action=finish_action)
+    machine.initialize()
+
+    machine.dispatch(Event('go'))
+
+    assert calls == [
+        'enter_b',
+        'enter_b_returned',
+        'after_go',
+        'finish_action',
+    ]
+    assert machine.state is c
+
+
+def test_multiple_internal_events_keep_fifo_order():
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+
+    def enter_b(state, event):
+        machine.dispatch(Event('validate'))
+        machine.dispatch(Event('metrics'))
+
+    b.handlers = {'enter': enter_b}
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_transition(a, b, events=['go'])
+    machine.add_transition(b, None, events=['validate'],
+                           action=lambda s, e: calls.append('validate'))
+    machine.add_transition(b, None, events=['metrics'],
+                           action=lambda s, e: calls.append('metrics'))
+    machine.initialize()
+
+    machine.dispatch(Event('go'))
+
+    assert calls == ['validate', 'metrics']
+
+
+def test_internal_queue_drains_before_external_queue():
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+
+    def enter_b(state, event):
+        machine._external_queue.append(Event('external'))
+        machine.dispatch(Event('internal'))
+
+    b.handlers = {'enter': enter_b}
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_transition(a, b, events=['go'])
+    machine.add_transition(b, None, events=['external'],
+                           action=lambda s, e: calls.append('external'))
+    machine.add_transition(b, None, events=['internal'],
+                           action=lambda s, e: calls.append('internal'))
+    machine.initialize()
+
+    machine.dispatch(Event('go'))
+
+    assert calls == ['internal', 'external']
+
+
+def test_max_internal_steps_guard():
+    machine = QueuedStateMachine('m', max_internal_steps=2)
+    state = State('state')
+
+    machine.add_state(state, initial=True)
+    machine.add_transition(state, None, events=['loop'],
+                           action=lambda s, e: machine.dispatch(Event('loop')))
+    machine.initialize()
+
+    try:
+        machine.dispatch(Event('loop'))
+    except StateMachineException as exc:
+        assert 'max_internal_steps=2' in str(exc)
+    else:
+        assert False, 'Expected StateMachineException'
+
+
+def test_internal_events_from_every_phase_keep_source_order():
+    phases = ['handler', 'condition', 'before', 'exit', 'action',
+              'enter', 'after']
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+
+    def mark(phase):
+        machine.dispatch(Event('mark', input=phase))
+
+    def handler(state, event):
+        mark('handler')
+
+    def condition(state, event):
+        mark('condition')
+        return True
+
+    def before(state, event):
+        mark('before')
+
+    def exit_a(state, event):
+        mark('exit')
+
+    def action(state, event):
+        mark('action')
+
+    def enter_b(state, event):
+        mark('enter')
+
+    def after(state, event):
+        mark('after')
+
+    def record(state, event):
+        calls.append(event.input)
+
+    a.handlers = {'go': handler, 'exit': exit_a}
+    b.handlers = {'enter': enter_b}
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_transition(a, b, events=['go'], condition=condition,
+                           before=before, action=action, after=after)
+    machine.add_transition(b, None, events=['mark'], input=phases,
+                           action=record)
+    machine.initialize()
+
+    machine.dispatch(Event('go'))
+
+    assert calls == phases
+
+
+@pytest.mark.parametrize('phase', [
+    'handler',
+    'condition',
+    'before',
+    'exit',
+    'action',
+    'enter',
+    'after',
+])
+def test_queued_callback_failure_clears_queued_work_from_each_phase(phase):
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+    b = State('b')
+
+    def fail(state, event):
+        machine.dispatch(Event('stale'))
+        raise RuntimeError(phase)
+
+    def condition(state, event):
+        if phase == 'condition':
+            fail(state, event)
+        return True
+
+    def record_stale(state, event):
+        calls.append('stale')
+
+    a.handlers = {'stale': record_stale}
+    b.handlers = {'stale': record_stale}
+    if phase == 'handler':
+        a.handlers['go'] = fail
+    if phase == 'exit':
+        a.handlers['exit'] = fail
+    if phase == 'enter':
+        b.handlers['enter'] = fail
+
+    machine.add_state(a, initial=True)
+    machine.add_state(b)
+    machine.add_transition(
+        a, b, events=['go'],
+        condition=condition,
+        before=fail if phase == 'before' else None,
+        action=fail if phase == 'action' else None,
+        after=fail if phase == 'after' else None)
+    machine.initialize()
+
+    with pytest.raises(RuntimeError, match=phase):
+        machine.dispatch(Event('go'))
+
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+    machine.dispatch(Event('unknown'))
+    assert calls == []
+
+
+def test_queued_base_exception_clears_queues_and_releases_processor():
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+
+    def aborting_action(state, event):
+        machine.dispatch(Event('stale'))
+        raise SchedulerAbort()
+
+    machine.add_state(a, initial=True)
+    machine.add_transition(a, None, events=['go'], action=aborting_action)
+    machine.add_transition(a, None, events=['stale'],
+                           action=lambda s, e: calls.append('stale'))
+    machine.initialize()
+
+    try:
+        machine.dispatch(Event('go'))
+    except SchedulerAbort:
+        pass
+    else:
+        assert False, 'Expected SchedulerAbort'
+
+    assert machine._is_processing is False
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+    machine.dispatch(Event('unknown'))
+    assert calls == []
+
+
+def test_queued_runtime_error_clears_pending_internal_events():
+    calls = []
+    machine = QueuedStateMachine('m')
+    a = State('a')
+
+    def aborting_action(state, event):
+        machine.dispatch(Event('stale'))
+        raise RuntimeError('boom')
+
+    machine.add_state(a, initial=True)
+    machine.add_transition(a, None, events=['go'], action=aborting_action)
+    machine.add_transition(a, None, events=['stale'],
+                           action=lambda s, e: calls.append('stale'))
+    machine.initialize()
+
+    try:
+        machine.dispatch(Event('go'))
+    except RuntimeError:
+        pass
+    else:
+        assert False, 'Expected RuntimeError'
+
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+    machine.dispatch(Event('unknown'))
+    assert calls == []
+
+
+def test_thread_safe_queued_machine_serializes_concurrent_dispatches():
+    machine = ThreadSafeQueuedStateMachine('m')
+    off = State('off')
+    on = State('on')
+
+    machine.add_state(off, initial=True)
+    machine.add_state(on)
+    machine.add_transition(off, on, events=['toggle'])
+    machine.add_transition(on, off, events=['toggle'])
+    machine.initialize()
+
+    def toggle_many():
+        for _ in range(10):
+            machine.dispatch(Event('toggle'))
+
+    threads = [threading.Thread(target=toggle_many) for _ in range(10)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert machine.state is off
+    assert machine.leaf_state is off
+    assert len(machine.leaf_state_stack.deque) <= machine.STACK_SIZE
+
+
+def test_thread_safe_nested_machine_uses_root_scheduler_for_internal_event():
+    calls = []
+    machine = ThreadSafeQueuedStateMachine('root')
+    child = StateMachine('child')
+    a = State('a')
+    b = State('b')
+
+    def enter_b(state, event):
+        calls.append('enter_b')
+        machine.dispatch(Event('finish'))
+
+    b.handlers = {'enter': enter_b}
+    machine.add_state(child, initial=True)
+    child.add_state(a, initial=True)
+    child.add_state(b)
+    child.add_transition(a, b, events=['go'])
+    child.add_transition(b, None, events=['finish'],
+                         action=lambda s, e: calls.append('finish'))
+    machine.initialize()
+
+    machine.dispatch(Event('go'))
+
+    assert calls == ['enter_b', 'finish']
+    assert machine.leaf_state is b
+
+
+def test_thread_safe_queued_machine_survives_slow_handler_storm():
+    machine = ThreadSafeQueuedStateMachine('m')
+    off = State('off')
+    on = State('on')
+
+    def slow_action(state, event):
+        import time
+        time.sleep(0.001)
+
+    machine.add_state(off, initial=True)
+    machine.add_state(on)
+    machine.add_transition(off, on, events=['toggle'], action=slow_action)
+    machine.add_transition(on, off, events=['toggle'], action=slow_action)
+    machine.initialize()
+
+    threads = [
+        threading.Thread(
+            target=lambda: [machine.dispatch(Event('toggle'))
+                            for _ in range(5)])
+        for _ in range(20)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert machine.state is off
+    assert machine.leaf_state is off
+    assert list(machine._internal_queue) == []
+    assert list(machine._external_queue) == []
+
+
+def test_thread_safe_queued_machine_never_runs_two_handlers_at_once():
+    active_handlers = [0]
+    max_active_handlers = [0]
+    guard = threading.Lock()
+    machine = ThreadSafeQueuedStateMachine('m')
+    off = State('off')
+    on = State('on')
+
+    def slow_action(state, event):
+        import time
+        with guard:
+            active_handlers[0] += 1
+            max_active_handlers[0] = max(
+                max_active_handlers[0], active_handlers[0])
+        time.sleep(0.001)
+        with guard:
+            active_handlers[0] -= 1
+
+    machine.add_state(off, initial=True)
+    machine.add_state(on)
+    machine.add_transition(off, on, events=['toggle'], action=slow_action)
+    machine.add_transition(on, off, events=['toggle'], action=slow_action)
+    machine.initialize()
+
+    start = threading.Barrier(11)
+
+    def toggle_many():
+        start.wait()
+        for _ in range(5):
+            machine.dispatch(Event('toggle'))
+
+    threads = [threading.Thread(target=toggle_many) for _ in range(10)]
+    for thread in threads:
+        thread.start()
+    start.wait()
+    for thread in threads:
+        thread.join()
+
+    assert max_active_handlers[0] == 1
+    assert active_handlers[0] == 0
