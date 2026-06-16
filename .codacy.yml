@@ -8,7 +8,15 @@ engines:
     exclude_paths:
       - "pysm/serialization.py"
 exclude_paths:
-  - "*"
-  - "**/*"
-include_paths:
-  - "pysm/**"
+  - ".codacy.yml"
+  - ".github/**"
+  - ".gitignore"
+  - ".pylintrc"
+  - "conftest.py"
+  - "docs/**"
+  - "examples/**"
+  - "LICENSE"
+  - "README.rst"
+  - "setup.cfg"
+  - "setup.py"
+  - "test/**"
