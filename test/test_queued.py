@@ -89,6 +89,64 @@ def test_queued_initialize_dispatch_from_enter_runs_after_initial_path():
     assert machine.leaf_state is done
 
 
+def test_queued_initialize_dispatch_waits_until_all_child_machines_are_ready():
+    calls = []
+    machine = QueuedStateMachine('root')
+    left = StateMachine('left')
+    active = State('active')
+    right = StateMachine('right')
+    right_child = StateMachine('right_child')
+    right_leaf = State('right_leaf')
+
+    def enter_left(state, event):
+        calls.append('enter_left')
+        machine.dispatch(Event('go'))
+        assert right.state is right_child
+        assert right_child.state is right_leaf
+
+    def enter_active(state, event):
+        calls.append('enter_active')
+
+    def go(state, event):
+        calls.append(('go', right.state.name, right_child.state.name))
+        assert right.state is right_child
+        assert right_child.state is right_leaf
+
+    def enter_right(state, event):
+        calls.append('enter_right')
+
+    def enter_right_child(state, event):
+        calls.append('enter_right_child')
+
+    def enter_right_leaf(state, event):
+        calls.append('enter_right_leaf')
+
+    left.handlers = {'enter': enter_left}
+    active.handlers = {'enter': enter_active}
+    right.handlers = {'enter': enter_right}
+    right_child.handlers = {'enter': enter_right_child}
+    right_leaf.handlers = {'enter': enter_right_leaf}
+
+    machine.add_state(left, initial=True)
+    machine.add_state(right)
+    left.add_state(active, initial=True)
+    right.add_state(right_child, initial=True)
+    right_child.add_state(right_leaf, initial=True)
+    machine.add_transition(left, right, events=['go'], action=go)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert calls == [
+        'enter_left',
+        'enter_active',
+        ('go', 'right_child', 'right_leaf'),
+        'enter_right',
+        'enter_right_child',
+        'enter_right_leaf',
+    ]
+    assert machine.leaf_state is right_leaf
+
+
 def test_threadsafe_initialize_dispatch_from_enter_uses_queued_semantics():
     calls = []
     machine = ThreadSafeQueuedStateMachine('root')
