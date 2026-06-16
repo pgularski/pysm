@@ -34,12 +34,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          changed="false"
+          package_changed="false"
+          version_changed="false"
           while IFS= read -r file; do
             case "$file" in
+              pysm/version.py)
+                version_changed="true"
+                package_changed="true"
+                ;;
               pysm/*)
-                changed="true"
-                break
+                package_changed="true"
                 ;;
             esac
           done < <(
@@ -48,17 +52,22 @@ jobs:
               --jq '.[] | .filename, (.previous_filename // empty)'
           )
 
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "package_changed=$package_changed" >> "$GITHUB_OUTPUT"
+          echo "version_changed=$version_changed" >> "$GITHUB_OUTPUT"
 
       - name: Bump patch version
         id: bump
-        if: steps.package_changes.outputs.changed == 'true'
+        if: |
+          steps.package_changes.outputs.package_changed == 'true' &&
+          steps.package_changes.outputs.version_changed != 'true'
         run: |
           version="$(python .github/scripts/bump_patch_version.py)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Commit patch bump
-        if: steps.package_changes.outputs.changed == 'true'
+        if: |
+          steps.package_changes.outputs.package_changed == 'true' &&
+          steps.package_changes.outputs.version_changed != 'true'
         run: |
           if git diff --quiet -- pysm/version.py; then
             echo "No version change detected."
@@ -72,5 +81,9 @@ jobs:
           git push origin HEAD:master
 
       - name: Skip patch bump
-        if: steps.package_changes.outputs.changed != 'true'
+        if: steps.package_changes.outputs.package_changed != 'true'
         run: echo "No files under pysm/ changed; skipping patch bump."
+
+      - name: Skip patch bump for explicit version change
+        if: steps.package_changes.outputs.version_changed == 'true'
+        run: echo "pysm/version.py changed in the merged PR; skipping automatic patch bump."
