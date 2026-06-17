@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-17
+
+### Fixed
+
+- Fixed MicroPython compatibility for optional queued, async queued, and serialization modules by reusing the core deque compatibility wrapper.
+- Replaced async callback awaitable detection's dependency on `inspect.isawaitable` with a lightweight runtime-compatible helper.
+
+### Tests
+
+- Added optional-module regression coverage for MicroPython-style deque construction and awaitable detection.
+
+### CI
+
+- Made patch-release automation generate a versioned changelog entry from merged pull request metadata when an automatic patch bump has no existing release notes.
+
 ## [0.4.0] - 2026-06-16
 
 ### Added

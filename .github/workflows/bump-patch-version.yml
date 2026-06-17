@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
   group: bump-patch-version-master
@@ -108,11 +109,54 @@ jobs:
 
       - name: Build release notes
         if: steps.package_changes.outputs.package_changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.release_version.outputs.version }}
         run: |
-          python .github/scripts/extract_changelog_entry.py \
-            --version "${{ steps.release_version.outputs.version }}" \
+          if python .github/scripts/extract_changelog_entry.py \
+            --version "$RELEASE_VERSION" \
             --changelog CHANGELOG.md \
             --output /tmp/release-notes.md
+          then
+            exit 0
+          fi
+
+          merge_subject="$(git log -1 --pretty=%s "$GITHUB_SHA")"
+          pr_number="$(printf '%s\n' "$merge_subject" | sed -n 's/^Merge pull request #\([0-9][0-9]*\).*/\1/p')"
+
+          if [ -n "$pr_number" ]; then
+            gh api "repos/${{ github.repository }}/pulls/$pr_number" \
+              > /tmp/release-pr.json
+          else
+            python - <<'PY'
+import json
+import os
+import subprocess
+
+repository = os.environ.get('GITHUB_REPOSITORY', '')
+server_url = os.environ.get('GITHUB_SERVER_URL', 'https://github.com')
+sha = os.environ.get('GITHUB_SHA', 'HEAD')
+subject = subprocess.check_output(
+    ['git', 'log', '-1', '--pretty=%s', sha],
+    text=True,
+).strip()
+metadata = {
+    'title': subject or 'Merged package changes',
+    'number': None,
+    'html_url': '{0}/{1}/commit/{2}'.format(server_url, repository, sha),
+    'labels': [],
+    'user': {'login': os.environ.get('GITHUB_ACTOR', '')},
+}
+with open('/tmp/release-pr.json', 'w', encoding='utf-8') as handle:
+    json.dump(metadata, handle)
+PY
+          fi
+
+          python .github/scripts/prepend_changelog_entry.py \
+            --version "$RELEASE_VERSION" \
+            --pr-json /tmp/release-pr.json \
+            --changelog CHANGELOG.md \
+            --notes-file /tmp/release-notes.md
 
       - name: Commit patch bump
         id: commit
@@ -120,7 +164,7 @@ jobs:
           steps.package_changes.outputs.package_changed == 'true' &&
           steps.package_changes.outputs.version_changed != 'true'
         run: |
-          if git diff --quiet -- pysm/version.py; then
+          if git diff --quiet -- pysm/version.py CHANGELOG.md; then
             echo "No version change detected."
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -128,7 +172,7 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pysm/version.py
+          git add pysm/version.py CHANGELOG.md
           git commit -m "Bump patch version to ${{ steps.bump.outputs.version }} [skip ci]"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "committed=true" >> "$GITHUB_OUTPUT"
