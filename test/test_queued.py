@@ -277,6 +277,106 @@ def test_internal_dispatch_from_enter_runs_after_current_transition_finishes():
     assert machine.state is c
 
 
+def test_issue_9_nested_enter_dispatch_returns_exited_machine_to_initial_state():
+    class GenericState(StateMachine):
+        def __init__(self, name):
+            super(GenericState, self).__init__(name)
+            self.handlers = {
+                'enter': self.on_enter,
+                'exit': self.on_exit,
+            }
+
+        def on_enter(self, state, event):
+            pass
+
+        def on_exit(self, state, event):
+            pass
+
+        def send_event(self, name, **kwargs):
+            self.root_machine.dispatch(Event(name, **kwargs))
+
+    class Move(GenericState):
+        def __init__(self):
+            super(Move, self).__init__('move')
+
+        def on_enter(self, state, event):
+            self.send_event('e_move_done')
+
+    class Jump(GenericState):
+        def __init__(self):
+            super(Jump, self).__init__('jump')
+
+        def on_enter(self, state, event):
+            self.send_event('e_jump_done')
+
+    class MoveAndJump(GenericState):
+        def __init__(self):
+            super(MoveAndJump, self).__init__('move_and_jump')
+            self.move = Move()
+            self.jump = Jump()
+            self.add_state(self.move, initial=True)
+            self.add_state(self.jump)
+            self.add_transition(self.move, self.jump,
+                                events=['e_move_done'])
+
+    class WaitForResult(GenericState):
+        def __init__(self):
+            super(WaitForResult, self).__init__('wait_for_result')
+
+        def on_enter(self, state, event):
+            self.send_event('e_wait_done')
+
+    class Turn(GenericState):
+        def __init__(self):
+            super(Turn, self).__init__('turn')
+            self.count = 0
+            self.move_and_jump = MoveAndJump()
+            self.wait_for_result = WaitForResult()
+            self.add_state(self.move_and_jump, initial=True)
+            self.add_state(self.wait_for_result)
+            self.add_transition(
+                self.move_and_jump, self.move_and_jump,
+                events=['e_jump_done'],
+                condition=lambda s, e: self.count < 3,
+                action=self.add)
+            self.add_transition(
+                self.move_and_jump, self.wait_for_result,
+                events=['e_jump_done'],
+                condition=lambda s, e: self.count == 3,
+                action=self.add)
+
+        def add(self, state, event):
+            self.count += 1
+
+        def on_exit(self, state, event):
+            self.count = 0
+
+    class Idle(GenericState):
+        def __init__(self):
+            super(Idle, self).__init__('idle')
+
+        def on_enter(self, state, event):
+            self.root_machine.initialize()
+
+    machine = QueuedStateMachine('main')
+    idle = Idle()
+    turn = Turn()
+    machine.add_state(idle, initial=True)
+    machine.add_state(turn)
+    machine.add_transition(idle, turn, events=['e_turn'])
+    machine.add_transition(turn, idle, events=['e_wait_done'])
+    machine.initialize()
+
+    for _ in range(2):
+        machine.dispatch(Event('e_turn'))
+
+        assert machine.state is idle
+        assert machine.leaf_state is idle
+        assert turn.state is turn.move_and_jump
+        assert turn.move_and_jump.state is turn.move_and_jump.move
+        assert turn.count == 0
+
+
 def test_multiple_internal_events_keep_fifo_order():
     calls = []
     machine = QueuedStateMachine('m')
