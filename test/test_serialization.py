@@ -93,6 +93,65 @@ def test_snapshot_restore_does_not_serialize_user_pda_stack():
     assert list(restored_child.stack.deque) == ['keep child stack']
 
 
+def _issue_8_machine():
+    machine = StateMachine('device')
+    active = StateMachine('active')
+    asleep = State('asleep')
+    idle = State('idle')
+    running = State('running')
+
+    machine.add_state(active, initial=True)
+    machine.add_state(asleep)
+    active.add_state(idle, initial=True)
+    active.add_state(running)
+    active.add_transition(idle, running, events=['start'])
+    machine.add_transition(active, asleep, events=['sleep'])
+    machine.initialize()
+
+    return machine, {
+        'active': active,
+        'asleep': asleep,
+        'idle': idle,
+        'running': running,
+    }
+
+
+def test_issue_8_snapshot_restore_recovers_state_history_after_rebuild():
+    machine, _ = _issue_8_machine()
+    machine.dispatch(Event('start'))
+    machine.dispatch(Event('sleep'))
+
+    data = snapshot(machine)
+
+    restored, restored_states = _issue_8_machine()
+    restore(restored, data)
+
+    assert restored.leaf_state is restored_states['asleep']
+    assert restored.state is restored_states['asleep']
+    assert restored_states['active'].state is restored_states['idle']
+    assert [state.name for state in restored.state_stack.deque] == ['active']
+    assert [state.name for state in
+            restored_states['active'].state_stack.deque] == [
+                'idle',
+                'running',
+            ]
+    assert [state.name for state in restored.leaf_state_stack.deque] == [
+        'idle',
+        'running',
+    ]
+
+    restored.set_previous_leaf_state(Event('wake'))
+
+    assert restored.leaf_state is restored_states['running']
+    assert restored.state is restored_states['active']
+    assert restored_states['active'].state is restored_states['running']
+    assert [state.name for state in restored.leaf_state_stack.deque] == [
+        'idle',
+        'running',
+        'asleep',
+    ]
+
+
 def test_restore_fails_on_topology_mismatch():
     machine = _duplicate_name_machine()
     data = snapshot(machine)
