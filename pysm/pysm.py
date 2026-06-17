@@ -26,9 +26,65 @@ Goals:
 .. |Callable| replace:: :class:`~collections.Callable`
 
 '''
-import logging
 import sys
-from collections import defaultdict, deque
+from collections import deque
+
+try:
+    from collections import defaultdict
+except ImportError:
+    class defaultdict(object):
+        def __init__(self, default_factory=None):
+            self.default_factory = default_factory
+            self._data = {}
+
+        def __getitem__(self, key):
+            try:
+                return self._data[key]
+            except KeyError:
+                return self.__missing__(key)
+
+        def __setitem__(self, key, value):
+            self._data[key] = value
+
+        def __missing__(self, key):
+            if self.default_factory is None:
+                raise KeyError(key)
+            value = self.default_factory()
+            self[key] = value
+            return value
+
+try:
+    import logging
+except ImportError:
+    class _NoopLogger(object):
+        def addHandler(self, handler):
+            pass
+
+        def setLevel(self, level):
+            pass
+
+        def debug(self, *args, **kwargs):
+            pass
+
+        def info(self, *args, **kwargs):
+            pass
+
+        def warning(self, *args, **kwargs):
+            pass
+
+        def error(self, *args, **kwargs):
+            pass
+
+    class _LoggingFallback(object):
+        INFO = 20
+
+        def getLogger(self, name):
+            return _NoopLogger()
+
+        def StreamHandler(self, stream=None):
+            return None
+
+    logging = _LoggingFallback()
 
 
 # Required to make it Micropython compatible
@@ -45,12 +101,21 @@ def patch_deque(deque_module):
             if iterable is None:
                 iterable = []
             if maxlen in [None, 0]:
-                maxlen = getattr(sys, 'maxsize', 2 ** 31 - 1)
-            self.q = deque_module.deque(iterable, maxlen)
+                self.q = list(iterable)
+                maxlen = 0
+            else:
+                self.q = deque_module.deque(iterable, maxlen)
             self.maxlen = maxlen
 
         def pop(self):
             return self.q.pop()
+
+        def popleft(self):
+            if hasattr(self.q, 'popleft'):
+                return self.q.popleft()
+            if not self.q:
+                raise IndexError('pop from an empty deque')
+            return self.q.pop(0)
 
         def append(self, item):
             if self.maxlen > 0 and len(self.q) >= self.maxlen:
@@ -70,7 +135,10 @@ def patch_deque(deque_module):
             return iter(self.q)
 
         def __getitem__(self, key):
-            return self.q[key]
+            try:
+                return self.q[key]
+            except IndexError:
+                raise IndexError('deque index out of range')
 
     return deque_maxlen
 
@@ -624,9 +692,7 @@ class StateMachine(State):
                 self._transitions.add(key, transition)
 
     def _get_transition(self, event):
-        leaf_state = self.leaf_state
-        assert leaf_state is not None
-        machine = leaf_state.parent
+        machine = self._require_initialized().parent
         while machine:
             transition = machine._transitions.get(event)
             if transition:
@@ -650,6 +716,14 @@ class StateMachine(State):
         '''
         return self.root_machine._leaf_state
         #  return self._get_leaf_state(self)
+
+    def _require_initialized(self):
+        leaf_state = self.leaf_state
+        if leaf_state is None:
+            raise StateMachineException(
+                'StateMachine "{0}" must be initialized before dispatch'
+                .format(self.name))
+        return leaf_state
 
     def _get_leaf_state(self, state):
         while hasattr(state, 'state') and state.state is not None:
@@ -710,8 +784,7 @@ class StateMachine(State):
 
         '''
         event.state_machine = self
-        leaf_state_before = self.leaf_state
-        assert leaf_state_before is not None
+        leaf_state_before = self._require_initialized()
         leaf_state_before._on(event)
         transition = self._get_transition(event)
         if transition is None:
@@ -728,8 +801,7 @@ class StateMachine(State):
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:
             return None
-        state = self.leaf_state
-        assert state is not None
+        state = self._require_initialized()
         self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and

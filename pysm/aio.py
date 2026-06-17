@@ -28,7 +28,7 @@ class AsyncQueuedStateMachine(StateMachine):
         self._external_queue = deque()
         self._is_processing = False
         self._processing_task = None
-        self._execution_lock = asyncio.Lock()
+        self._execution_lock = None
 
     def initialize(self, fire_events_on_init=False):
         if fire_events_on_init:
@@ -39,7 +39,7 @@ class AsyncQueuedStateMachine(StateMachine):
 
     async def async_initialize(self, fire_events_on_init=False):
         '''Initialize and optionally await entry handlers on the initial path.'''
-        async with self._execution_lock:
+        async with self._get_execution_lock():
             StateMachine.initialize(self, fire_events_on_init=False)
             if not fire_events_on_init:
                 return
@@ -84,7 +84,7 @@ class AsyncQueuedStateMachine(StateMachine):
                 self._external_queue.append(event)
             return
 
-        async with self._execution_lock:
+        async with self._get_execution_lock():
             self._external_queue.append(event)
             self._is_processing = True
             self._processing_task = current_task
@@ -100,7 +100,7 @@ class AsyncQueuedStateMachine(StateMachine):
 
     async def _dispatch_one(self, event):
         event.state_machine = self
-        leaf_state_before = self.leaf_state
+        leaf_state_before = self._require_initialized()
         await self._on(leaf_state_before, event)
         transition = await self._get_transition(event)
         if transition is None:
@@ -226,3 +226,8 @@ class AsyncQueuedStateMachine(StateMachine):
             self._internal_queue.popleft()
         while self._external_queue:
             self._external_queue.popleft()
+
+    def _get_execution_lock(self):
+        if self._execution_lock is None:
+            self._execution_lock = asyncio.Lock()
+        return self._execution_lock

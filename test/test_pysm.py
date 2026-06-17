@@ -701,6 +701,15 @@ def test_no_initial_state():
     assert expected in str(exc.value)
 
 
+def test_dispatch_before_initialize_fails_clearly():
+    sm = StateMachine('sm')
+    s1 = State('s1')
+    sm.add_state(s1, initial=True)
+
+    with pytest.raises(StateMachineException, match='initialized'):
+        sm.dispatch(Event('a'))
+
+
 def test_many_initial_states():
     sm = StateMachine('sm')
     s1 = State('s1')
@@ -1705,6 +1714,85 @@ def test_micropython_deque_maxlen_exceeded():
     finally:
         deque = old_deque
 
+
+def test_micropython_deque_unbounded_does_not_allocate_maxlen():
+    from pysm.pysm import patch_deque
+
+    class StrictMicropythonDeque(object):
+        def __init__(self, iterable, maxlen):
+            raise AssertionError(
+                'unbounded deque should not allocate maxlen={0}'.format(
+                    maxlen))
+
+    class StrictMicropythonDequeModule(object):
+        deque = StrictMicropythonDeque
+
+    deque = patch_deque(StrictMicropythonDequeModule)
+    queue = deque()
+    queue.append(1)
+    queue.append(2)
+
+    assert queue.popleft() == 1
+    assert queue.popleft() == 2
+
+    with pytest.raises(IndexError):
+        queue.popleft()
+
+
+def test_core_imports_without_logging_module(monkeypatch):
+    import builtins
+    import importlib.util
+    import os
+
+    real_import = builtins.__import__
+
+    def import_without_logging(name, *args, **kwargs):
+        if name == 'logging':
+            raise ImportError('no module named logging')
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', import_without_logging)
+
+    module_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'pysm', 'pysm.py')
+    spec = importlib.util.spec_from_file_location(
+        'pysm_without_logging', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    module.logger.debug('available')
+    module.logger.info('available')
+
+
+def test_core_imports_without_collections_defaultdict(monkeypatch):
+    import builtins
+    import collections
+    import importlib.util
+    import os
+    import types
+
+    real_import = builtins.__import__
+    collections_without_defaultdict = types.ModuleType('collections')
+    collections_without_defaultdict.deque = collections.deque
+
+    def import_without_defaultdict(name, *args, **kwargs):
+        if name == 'collections':
+            return collections_without_defaultdict
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', import_without_defaultdict)
+
+    module_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'pysm', 'pysm.py')
+    spec = importlib.util.spec_from_file_location(
+        'pysm_without_defaultdict', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    data = module.defaultdict(list)
+    data['events'].append('go')
+
+    assert data['events'] == ['go']
 
 
 def test_leaf_state_from_action_method():

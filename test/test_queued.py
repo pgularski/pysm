@@ -26,6 +26,15 @@ def test_queued_machine_behaves_like_core_for_simple_transition():
     assert machine.leaf_state is on
 
 
+def test_queued_dispatch_before_initialize_fails_clearly():
+    machine = QueuedStateMachine('m')
+    off = State('off')
+    machine.add_state(off, initial=True)
+
+    with pytest.raises(StateMachineException, match='initialized'):
+        machine.dispatch(Event('turn_on'))
+
+
 def test_queued_initialize_can_fire_enter_handlers_on_initial_hsm_path():
     calls = []
     machine = QueuedStateMachine('root')
@@ -78,6 +87,64 @@ def test_queued_initialize_dispatch_from_enter_runs_after_initial_path():
 
     assert calls == ['enter_child', 'enter_leaf', 'finish']
     assert machine.leaf_state is done
+
+
+def test_queued_initialize_dispatch_waits_until_all_child_machines_are_ready():
+    calls = []
+    machine = QueuedStateMachine('root')
+    left = StateMachine('left')
+    active = State('active')
+    right = StateMachine('right')
+    right_child = StateMachine('right_child')
+    right_leaf = State('right_leaf')
+
+    def enter_left(state, event):
+        calls.append('enter_left')
+        machine.dispatch(Event('go'))
+        assert right.state is right_child
+        assert right_child.state is right_leaf
+
+    def enter_active(state, event):
+        calls.append('enter_active')
+
+    def go(state, event):
+        calls.append(('go', right.state.name, right_child.state.name))
+        assert right.state is right_child
+        assert right_child.state is right_leaf
+
+    def enter_right(state, event):
+        calls.append('enter_right')
+
+    def enter_right_child(state, event):
+        calls.append('enter_right_child')
+
+    def enter_right_leaf(state, event):
+        calls.append('enter_right_leaf')
+
+    left.handlers = {'enter': enter_left}
+    active.handlers = {'enter': enter_active}
+    right.handlers = {'enter': enter_right}
+    right_child.handlers = {'enter': enter_right_child}
+    right_leaf.handlers = {'enter': enter_right_leaf}
+
+    machine.add_state(left, initial=True)
+    machine.add_state(right)
+    left.add_state(active, initial=True)
+    right.add_state(right_child, initial=True)
+    right_child.add_state(right_leaf, initial=True)
+    machine.add_transition(left, right, events=['go'], action=go)
+
+    machine.initialize(fire_events_on_init=True)
+
+    assert calls == [
+        'enter_left',
+        'enter_active',
+        ('go', 'right_child', 'right_leaf'),
+        'enter_right',
+        'enter_right_child',
+        'enter_right_leaf',
+    ]
+    assert machine.leaf_state is right_leaf
 
 
 def test_threadsafe_initialize_dispatch_from_enter_uses_queued_semantics():
@@ -208,6 +275,88 @@ def test_internal_dispatch_from_enter_runs_after_current_transition_finishes():
         'finish_action',
     ]
     assert machine.state is c
+
+
+def test_queued_nested_enter_dispatch_restores_exited_composite_to_initial():
+    entered = []
+    count = [0]
+    machine = QueuedStateMachine('main')
+    idle = State('idle')
+    turn = StateMachine('turn')
+    move_and_jump = StateMachine('move_and_jump')
+    move = State('move')
+    jump = State('jump')
+    wait_for_result = State('wait_for_result')
+
+    def send(name):
+        machine.dispatch(Event(name))
+
+    def enter_move(state, event):
+        entered.append('move')
+        send('e_move_done')
+
+    def enter_jump(state, event):
+        entered.append('jump')
+        send('e_jump_done')
+
+    def enter_wait_for_result(state, event):
+        entered.append('wait_for_result')
+        send('e_wait_done')
+
+    def add(state, event):
+        count[0] += 1
+
+    def reset_count(state, event):
+        count[0] = 0
+
+    move.handlers = {'enter': enter_move}
+    jump.handlers = {'enter': enter_jump}
+    wait_for_result.handlers = {'enter': enter_wait_for_result}
+    turn.handlers = {'exit': reset_count}
+
+    machine.add_state(idle, initial=True)
+    machine.add_state(turn)
+    turn.add_state(move_and_jump, initial=True)
+    turn.add_state(wait_for_result)
+    move_and_jump.add_state(move, initial=True)
+    move_and_jump.add_state(jump)
+    machine.add_transition(idle, turn, events=['e_turn'])
+    machine.add_transition(turn, idle, events=['e_wait_done'])
+    turn.add_transition(
+        move_and_jump, move_and_jump, events=['e_jump_done'],
+        condition=lambda s, e: count[0] < 3,
+        action=add)
+    turn.add_transition(
+        move_and_jump, wait_for_result, events=['e_jump_done'],
+        condition=lambda s, e: count[0] == 3,
+        action=add)
+    move_and_jump.add_transition(move, jump, events=['e_move_done'])
+    machine.initialize()
+
+    machine.dispatch(Event('e_turn'))
+
+    first_cycle = [
+        'move', 'jump',
+        'move', 'jump',
+        'move', 'jump',
+        'move', 'jump',
+        'wait_for_result',
+    ]
+    assert entered == first_cycle
+    assert count[0] == 0
+    assert machine.state is idle
+    assert turn.state is move_and_jump
+    assert move_and_jump.state is move
+    assert machine.leaf_state is idle
+
+    machine.dispatch(Event('e_turn'))
+
+    assert entered == first_cycle + first_cycle
+    assert count[0] == 0
+    assert machine.state is idle
+    assert turn.state is move_and_jump
+    assert move_and_jump.state is move
+    assert machine.leaf_state is idle
 
 
 def test_multiple_internal_events_keep_fifo_order():

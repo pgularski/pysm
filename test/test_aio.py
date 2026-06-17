@@ -30,6 +30,18 @@ def test_async_machine_behaves_like_core_for_simple_transition():
     asyncio.run(scenario())
 
 
+def test_async_dispatch_before_initialize_fails_clearly():
+    async def scenario():
+        machine = AsyncQueuedStateMachine('m')
+        off = State('off')
+        machine.add_state(off, initial=True)
+
+        with pytest.raises(StateMachineException, match='initialized'):
+            await machine.dispatch(Event('turn_on'))
+
+    asyncio.run(scenario())
+
+
 def test_async_initialize_rejects_sync_fire_events_on_init():
     machine = AsyncQueuedStateMachine('m')
     initial = State('initial')
@@ -38,6 +50,23 @@ def test_async_initialize_rejects_sync_fire_events_on_init():
 
     with pytest.raises(StateMachineException, match='async_initialize'):
         machine.initialize(fire_events_on_init=True)
+
+
+def test_async_execution_lock_is_created_lazily():
+    machine = AsyncQueuedStateMachine('m')
+    off = State('off')
+
+    machine.add_state(off, initial=True)
+    machine.initialize()
+
+    assert machine._execution_lock is None
+
+    async def scenario():
+        await machine.dispatch(Event('ignored'))
+
+    asyncio.run(scenario())
+
+    assert machine._execution_lock is not None
 
 
 def test_async_initialize_can_fire_enter_handlers_on_initial_hsm_path():
@@ -95,6 +124,109 @@ def test_async_initialize_dispatch_from_enter_runs_after_initial_path():
         await machine.async_initialize(fire_events_on_init=True)
 
         assert calls == ['enter_child', 'enter_leaf', 'finish']
+        assert machine.leaf_state is done
+
+    asyncio.run(scenario())
+
+
+def test_async_initialize_dispatch_waits_until_all_child_machines_are_ready():
+    async def scenario():
+        calls = []
+        machine = AsyncQueuedStateMachine('root')
+        left = StateMachine('left')
+        active = State('active')
+        right = StateMachine('right')
+        right_child = StateMachine('right_child')
+        right_leaf = State('right_leaf')
+
+        async def enter_left(state, event):
+            calls.append('enter_left')
+            await machine.dispatch(Event('go'))
+            assert right.state is right_child
+            assert right_child.state is right_leaf
+
+        async def enter_active(state, event):
+            calls.append('enter_active')
+
+        async def go(state, event):
+            calls.append(('go', right.state.name, right_child.state.name))
+            assert right.state is right_child
+            assert right_child.state is right_leaf
+
+        async def enter_right(state, event):
+            calls.append('enter_right')
+
+        async def enter_right_child(state, event):
+            calls.append('enter_right_child')
+
+        async def enter_right_leaf(state, event):
+            calls.append('enter_right_leaf')
+
+        left.handlers = {'enter': enter_left}
+        active.handlers = {'enter': enter_active}
+        right.handlers = {'enter': enter_right}
+        right_child.handlers = {'enter': enter_right_child}
+        right_leaf.handlers = {'enter': enter_right_leaf}
+
+        machine.add_state(left, initial=True)
+        machine.add_state(right)
+        left.add_state(active, initial=True)
+        right.add_state(right_child, initial=True)
+        right_child.add_state(right_leaf, initial=True)
+        machine.add_transition(left, right, events=['go'], action=go)
+
+        await machine.async_initialize(fire_events_on_init=True)
+
+        assert calls == [
+            'enter_left',
+            'enter_active',
+            ('go', 'right_child', 'right_leaf'),
+            'enter_right',
+            'enter_right_child',
+            'enter_right_leaf',
+        ]
+        assert machine.leaf_state is right_leaf
+
+    asyncio.run(scenario())
+
+
+def test_async_initialize_external_task_dispatch_drains_after_initial_path():
+    async def scenario():
+        calls = []
+        machine = AsyncQueuedStateMachine('root')
+        child = StateMachine('child')
+        leaf = State('leaf')
+        done = State('done')
+
+        async def enter_child(state, event):
+            calls.append('enter_child')
+            task = asyncio.create_task(machine.dispatch(Event('finish')))
+            await asyncio.wait_for(task, 0.1)
+            calls.append('external_dispatch_returned')
+            assert calls == ['enter_child', 'external_dispatch_returned']
+
+        async def enter_leaf(state, event):
+            calls.append('enter_leaf')
+
+        async def finish(state, event):
+            calls.append('finish')
+
+        child.handlers = {'enter': enter_child}
+        leaf.handlers = {'enter': enter_leaf}
+
+        machine.add_state(child, initial=True)
+        child.add_state(leaf, initial=True)
+        child.add_state(done)
+        child.add_transition(leaf, done, events=['finish'], action=finish)
+
+        await machine.async_initialize(fire_events_on_init=True)
+
+        assert calls == [
+            'enter_child',
+            'external_dispatch_returned',
+            'enter_leaf',
+            'finish',
+        ]
         assert machine.leaf_state is done
 
     asyncio.run(scenario())
