@@ -5,10 +5,42 @@ This module is intentionally not imported from ``pysm.__init__``. It requires
 CPython's ``asyncio`` runtime and keeps the classic core import untouched.
 '''
 import asyncio
-import inspect
-from collections import deque
+import sys
 
-from .pysm import Event, StateMachine, StateMachineException, any_event, logger
+from .pysm import (
+    Event,
+    StateMachine,
+    StateMachineException,
+    any_event,
+    deque,
+    logger,
+)
+
+try:
+    from types import CoroutineType, GeneratorType
+except ImportError:
+    CoroutineType = None
+    GeneratorType = None
+
+
+_CO_ITERABLE_COROUTINE = 0x100
+_IMPLEMENTATION_NAME = getattr(
+    getattr(sys, 'implementation', None), 'name', '')
+_IS_MICROPYTHON = _IMPLEMENTATION_NAME == 'micropython'
+
+
+def _is_awaitable(result):
+    if hasattr(result, '__await__'):
+        return True
+    if CoroutineType is not None and isinstance(result, CoroutineType):
+        return True
+    if GeneratorType is not None and isinstance(result, GeneratorType):
+        flags = getattr(getattr(result, 'gi_code', None), 'co_flags', 0)
+        if flags & _CO_ITERABLE_COROUTINE:
+            return True
+    if _IS_MICROPYTHON and hasattr(result, 'send'):
+        return hasattr(result, 'throw') or hasattr(result, 'close')
+    return False
 
 
 class AsyncQueuedStateMachine(StateMachine):
@@ -217,7 +249,7 @@ class AsyncQueuedStateMachine(StateMachine):
 
     async def _call(self, callback, state, event):
         result = callback(state, event)
-        if inspect.isawaitable(result):
+        if _is_awaitable(result):
             return await result
         return result
 
