@@ -4,9 +4,7 @@
 The classes in this module deliberately live outside ``pysm.__init__`` so the
 classic core import remains tiny and suitable for MicroPython-oriented builds.
 '''
-from collections import deque
-
-from .pysm import StateMachine, StateMachineException
+from .pysm import StateMachine, StateMachineException, deque
 
 
 class QueuedStateMachine(StateMachine):

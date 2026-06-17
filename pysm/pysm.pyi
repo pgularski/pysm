@@ -19,6 +19,7 @@ _TransitionKey = Tuple[Optional[State], Hashable, Optional[Hashable]]
 class AnyEvent(object): ...
 any_event: AnyEvent
 logger: logging.Logger
+deque: Any
 
 class StateMachineException(Exception): ...
 

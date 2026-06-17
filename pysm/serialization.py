@@ -1,8 +1,6 @@
 # pyright: basic
 '''Optional snapshot/restore helpers for pysm state machines.'''
-from collections import deque
-
-from .pysm import StateMachine, StateMachineException
+from .pysm import StateMachine, StateMachineException, deque
 
 
 SNAPSHOT_VERSION = 1
