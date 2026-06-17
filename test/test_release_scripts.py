@@ -1,5 +1,7 @@
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,3 +54,44 @@ def test_extract_changelog_entry_finds_recovery_release_notes():
 
     assert 'MicroPython compatibility' in notes
     assert 'patch-release automation' in notes
+
+
+def test_release_metadata_from_commit_builds_commit_fallback():
+    metadata = _load_script('release_metadata_from_commit.py')
+
+    data = metadata.build_metadata(
+        'HEAD',
+        'pgularski/pysm',
+        'https://github.com/',
+        'pgularski',
+    )
+
+    assert data['title'] == subprocess.check_output(
+        ['git', 'log', '-1', '--pretty=%s', 'HEAD'],
+        text=True,
+    ).strip()
+    assert data['html_url'].startswith(
+        'https://github.com/pgularski/pysm/commit/')
+    assert data['user'] == {'login': 'pgularski'}
+
+
+def test_release_metadata_script_writes_json(tmp_path):
+    output = tmp_path / 'metadata.json'
+
+    subprocess.check_call([
+        'python',
+        str(ROOT / '.github' / 'scripts' / 'release_metadata_from_commit.py'),
+        '--sha',
+        'HEAD',
+        '--repository',
+        'pgularski/pysm',
+        '--actor',
+        'pgularski',
+        '--output',
+        str(output),
+    ])
+
+    data = json.loads(output.read_text(encoding='utf-8'))
+
+    assert data['title']
+    assert data['html_url'].endswith('/commit/HEAD')
