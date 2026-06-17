@@ -43,7 +43,7 @@ Goals
 -----
 
 * Provide a State Pattern-like behavior with more flexibility (see
-  `Documentation <http://pysm.readthedocs.io/en/latest/examples.html>`_ for
+  `Documentation <http://pysm.readthedocs.io/en/latest/examples.html>`__ for
   examples)
 * Be explicit and don't add any magic code to objects that use pysm
 * Handle directly any kind of event or input (not only strings) - parsing
@@ -68,7 +68,7 @@ Features
 * No need to extend a class with State Machine class (composition over inheritance)
 * Fast (even with hundreds of transition rules)
 * Not too many pythonisms, so that it's easily portable to other languages (ie. `JavaScript <https://github.com/pgularski/smjs>`_).
-* Micropython support
+* MicroPython support
 * Optional queued, thread-safe, async, serialization, builder, and typing helpers are available as explicit imports, so the core import stays small.
 
 
@@ -97,15 +97,35 @@ serialization, and builder modules.
 See Unit Tests to see it working and extensively tested.
 
 
-Micropython support
+MicroPython support
 -------------------
 
-The core runtime remains the intended shape for memory-constrained
-MicroPython/upysm builds. Optional CPython-oriented modules should stay out of
-device builds unless you explicitly need them and have measured the memory
-cost.
+Use `upysm <https://github.com/pgularski/upysm>`_ when installing this library
+on MicroPython. ``upysm`` is the MicroPython distribution channel for selected
+``pysm`` releases; it is not a fork and does not carry separate application
+code. The installed package still imports as ``pysm``::
 
-The library works with pyboards!::
+   from pysm import Event, State, StateMachine
+
+The default ``upysm`` package is core-focused for memory-constrained devices.
+Optional CPython-oriented modules should stay out of device builds unless you
+explicitly need them and have measured the memory cost.
+
+Modern MicroPython installations should use ``mip`` through ``mpremote``::
+
+   mpremote mip install https://pgularski.github.io/upysm/
+
+Pin a specific release for repeatable device builds, replacing ``0.4.0`` with
+the release you want::
+
+   mpremote mip install https://pgularski.github.io/upysm/0.4.0/
+
+You can also install from the MicroPython REPL::
+
+   import mip
+   mip.install('https://pgularski.github.io/upysm/')
+
+Older firmware that still uses ``upip`` can install the package from PyPI::
 
    import upip
    upip.install('upysm')
@@ -114,8 +134,8 @@ The library works with pyboards!::
 Links
 -----
 
-* `Documentation <http://pysm.readthedocs.io>`_
-* `Installation <http://pysm.readthedocs.io/en/latest/installing.html>`_
+* `Documentation <http://pysm.readthedocs.io>`__
+* `Installation <http://pysm.readthedocs.io/en/latest/installing.html>`__
 * `Github <https://github.com/pgularski/pysm>`_
 * `Issues <https://github.com/pgularski/pysm/issues>`_
 * `Examples <http://pysm.readthedocs.io/en/latest/examples.html>`_
