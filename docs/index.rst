@@ -11,6 +11,11 @@ modules provide run-to-completion event scheduling, thread-safe dispatch,
 async dispatch, serialization, builder ergonomics, and shipped type
 information for editors and type checkers.
 
+Use ``pysm`` directly on regular Python. For MicroPython devices, install
+``upysm`` instead; it is the MicroPython distribution channel for selected
+``pysm`` releases, not a separate source fork. The installed package still
+imports as ``pysm``.
+
 The core runtime still follows the original composition-first style: create
 states, add them to a root machine, add transitions, initialize the machine,
 and dispatch hashable events. Newer helpers are layered around that core
