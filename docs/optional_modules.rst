@@ -29,7 +29,7 @@ Core vs Optional Modules
    * - Queued runtime
      - ``from pysm.queued import QueuedStateMachine``
      - Run-to-completion event scheduling
-     - CPython-oriented optional module
+     - Not in the default ``upysm`` build
    * - Thread-safe queued runtime
      - ``from pysm.queued import ThreadSafeQueuedStateMachine``
      - Queued dispatch protected by ``threading.RLock``
@@ -65,6 +65,9 @@ hardening added a few details worth making visible:
   ``StateMachine`` instances are bounded by ``StateMachine.STACK_SIZE``. The
   default is ``32``. If you need an unbounded standalone stack, create
   ``Stack(maxlen=None)`` yourself.
+* Transition conditions are evaluated in registration order. A condition must
+  return the literal ``True`` to match; truthy values such as ``1`` do not
+  trigger the transition.
 * The core import does not load ``asyncio``, ``json``, ``threading``, or any of
   the optional ``pysm.*`` helper modules.
 
@@ -205,6 +208,21 @@ internal queue is empty. Use one event loop per machine.
 Use ``await machine.async_initialize(fire_events_on_init=True)`` if initial
 ``enter`` handlers need to be awaited.
 
+.. code-block:: python
+
+   calls = []
+   machine = AsyncQueuedStateMachine('m')
+   ready = State('ready')
+
+   async def on_enter_ready(state, event):
+       calls.append(state.name)
+
+   ready.handlers = {'enter': on_enter_ready}
+   machine.add_state(ready, initial=True)
+
+   await machine.async_initialize(fire_events_on_init=True)
+   assert calls == ['ready']
+
 
 Typed Packages
 --------------
@@ -287,16 +305,28 @@ String ``events`` and ``input`` values are treated as one event or input value,
 not as iterables of characters. Use a list, tuple, or other iterable when a
 single transition should match many values.
 
+``build()`` initializes the machine by default. Pass ``initialize=False`` when
+you want to finish setup with the core API and call ``initialize()`` yourself.
+
 
 MicroPython / upysm
 -------------------
 
-The MicroPython-oriented target should stay core-only:
+``upysm`` is the MicroPython distribution channel for selected ``pysm``
+releases. It is not a fork and does not provide a separate API; MicroPython
+installs still import the upstream package name:
 
 .. code-block:: python
 
    from pysm import StateMachine, State, Event
 
-Do not copy optional modules such as ``pysm.queued``, ``pysm.aio``,
-``pysm.serialization``, or ``pysm.builder`` into a constrained device build
-unless you explicitly need them and have measured the memory cost.
+The default ``upysm`` artifacts are built from the core runtime files
+(``pysm/__init__.py``, ``pysm/pysm.py``, and ``pysm/version.py``). This keeps
+the device package aligned with the upstream core while avoiding optional
+modules that pull in queues, ``threading``, ``asyncio``, serialization helpers,
+builder conveniences, or typing-only files.
+
+Do not add optional modules such as ``pysm.queued``, ``pysm.aio``,
+``pysm.serialization``, or ``pysm.builder`` to a constrained device build
+unless you explicitly need them and have measured the memory cost on your
+target firmware.

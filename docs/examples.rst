@@ -16,6 +16,68 @@ This is a simple state machine with only two states - `on` and `off`.
     :literal:
 
 
+Event input and fallback transitions
+------------------------------------
+
+Events can carry a separate ``input`` value. This is useful for parsers where
+many inputs share one event name. Use ``any_event`` when a state needs a
+fallback transition for a specific input regardless of the event name.
+
+.. code-block:: python
+
+    from pysm import Event, State, StateMachine, any_event
+
+    waiting = State('waiting')
+    digit = State('digit')
+    fallback = State('fallback')
+
+    machine = StateMachine('parser')
+    machine.add_state(waiting, initial=True)
+    machine.add_state(digit)
+    machine.add_state(fallback)
+    machine.add_transition(waiting, digit, events=['token'], input=['digit'])
+    machine.add_transition(
+        waiting, fallback, events=[any_event], input=['unknown'])
+    machine.initialize()
+
+    machine.dispatch(Event('token', input='unknown'))
+    assert machine.leaf_state is fallback
+
+
+Event propagation
+-----------------
+
+State handlers stop propagation by default. Set ``event.propagate`` back to
+``True`` when a child state should handle an event and then let a parent handle
+the same event too. ``enter`` and ``exit`` events never propagate.
+
+.. code-block:: python
+
+    from pysm import Event, State, StateMachine
+
+    calls = []
+    root = StateMachine('root')
+    child = StateMachine('child')
+    leaf = State('leaf')
+
+    def leaf_handler(state, event):
+        calls.append(state.name)
+        event.propagate = True
+
+    def child_handler(state, event):
+        calls.append(state.name)
+
+    leaf.handlers = {'bubble': leaf_handler}
+    child.handlers = {'bubble': child_handler}
+
+    root.add_state(child, initial=True)
+    child.add_state(leaf, initial=True)
+    root.initialize()
+
+    root.dispatch(Event('bubble'))
+    assert calls == ['leaf', 'child']
+
+
 Fluent builder
 --------------
 
