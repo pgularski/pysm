@@ -64,7 +64,7 @@ def build_bullet(metadata):
 
 
 def build_entries(version, release_date, metadata):
-    tag = 'v{0}'.format(version)
+    tag = version
     labels = [label.get('name', '') for label in metadata.get('labels') or []]
     category = choose_category(labels)
     bullet = build_bullet(metadata)
@@ -83,7 +83,7 @@ def build_entries(version, release_date, metadata):
 
 
 def insert_entry(changelog, tag, entry):
-    if re.search(r'^## \[{0}\](?:\s|-|\n)'.format(re.escape(tag)),
+    if re.search(r'^## \[v?{0}\](?:\s|-|\n)'.format(re.escape(tag)),
                  changelog, re.MULTILINE):
         return changelog
 
