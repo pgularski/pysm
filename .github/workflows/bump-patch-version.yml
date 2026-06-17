@@ -128,28 +128,8 @@ jobs:
             gh api "repos/${{ github.repository }}/pulls/$pr_number" \
               > /tmp/release-pr.json
           else
-            python - <<'PY'
-import json
-import os
-import subprocess
-
-repository = os.environ.get('GITHUB_REPOSITORY', '')
-server_url = os.environ.get('GITHUB_SERVER_URL', 'https://github.com')
-sha = os.environ.get('GITHUB_SHA', 'HEAD')
-subject = subprocess.check_output(
-    ['git', 'log', '-1', '--pretty=%s', sha],
-    text=True,
-).strip()
-metadata = {
-    'title': subject or 'Merged package changes',
-    'number': None,
-    'html_url': '{0}/{1}/commit/{2}'.format(server_url, repository, sha),
-    'labels': [],
-    'user': {'login': os.environ.get('GITHUB_ACTOR', '')},
-}
-with open('/tmp/release-pr.json', 'w', encoding='utf-8') as handle:
-    json.dump(metadata, handle)
-PY
+            python .github/scripts/release_metadata_from_commit.py \
+              --output /tmp/release-pr.json
           fi
 
           python .github/scripts/prepend_changelog_entry.py \
